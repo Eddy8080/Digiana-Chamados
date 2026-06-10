@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 import os
-import dj_database_url
+import urllib.parse
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -85,7 +85,18 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 
 _db_url = os.environ.get('DATABASE_URL')
 if _db_url:
-    DATABASES = {'default': dj_database_url.parse(_db_url, conn_max_age=600)}
+    _u = urllib.parse.urlparse(_db_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _u.path.lstrip('/'),
+            'USER': _u.username,
+            'PASSWORD': _u.password,
+            'HOST': _u.hostname,
+            'PORT': str(_u.port or 5432),
+            'CONN_MAX_AGE': 600,
+        }
+    }
 else:
     DATABASES = {
         'default': {
