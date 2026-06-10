@@ -1,8 +1,5 @@
-[phases.setup]
-nixPkgs = ["python311"]
-
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.11"
 
 [start]
 cmd = "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn setup.wsgi --bind 0.0.0.0:$PORT"
