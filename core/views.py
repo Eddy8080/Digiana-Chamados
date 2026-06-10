@@ -408,7 +408,7 @@ def disparar_email(assunto, mensagem, destinatarios):
         email.send()
         return True, ''
     except Exception as e:
-        erro = str(e)
+        erro = str(e) or f'{type(e).__name__} (sem mensagem)'
         logger.error("Falha ao enviar e-mail para %s — %s", destinatarios, erro)
         return False, erro
 

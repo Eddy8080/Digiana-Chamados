@@ -195,7 +195,7 @@
                 resultDiv.className = 'rounded-xl p-4 text-sm bg-rose-50 border border-rose-200 text-rose-800';
                 resultDiv.innerHTML =
                     '<strong>&#10007; Falha no envio</strong><br>' +
-                    '<span class="font-mono text-xs break-all">' + escapeHtml(data.erro) + '</span>';
+                    '<span class="font-mono text-xs break-all">' + escapeHtml(data.erro || 'Erro desconhecido — verifique os logs do servidor.') + '</span>';
             }
             if (data.diagnostico) {
                 diagDiv.classList.remove('hidden');
