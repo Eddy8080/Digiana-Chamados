@@ -2557,3 +2557,110 @@ Os links dentro do nav já usam condicionais de role (`{% if user_role == 'admin
 ### Garantia de Não-Regressão em Desktop
 
 Todas as correções usam exclusivamente os prefixos `sm:` (≥ 640px) e `md:` (≥ 768px) do Tailwind. Nenhuma alteração toca o comportamento em telas ≥ 768px. O layout desktop, incluindo todas as páginas admin-only, permanece idêntico ao estado atual.
+
+---
+
+## Deploy Railway — Histórico e Decisões
+
+### Infraestrutura atual (produção)
+
+| Item | Valor |
+|---|---|
+| Plataforma | Railway (`railway.app`) |
+| URL pública | `https://digiana-chamados-production.up.railway.app` |
+| Python | 3.11 (pinado via `.python-version`) |
+| Build | Railpack v0.27+ |
+| WSGI | Gunicorn |
+| Banco de dados | PostgreSQL (serviço Railway separado) |
+| Arquivos estáticos | WhiteNoise |
+| Branch deploy | `main` |
+
+### Variáveis de ambiente Railway (serviço Django)
+
+| Variável | Valor | Observação |
+|---|---|---|
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | Referência ao serviço PostgreSQL |
+
+O Railway também injeta automaticamente `RAILWAY_PUBLIC_DOMAIN`, `RAILWAY_ENVIRONMENT_NAME`, `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGPORT`.
+
+### Lógica de banco em `settings.py`
+
+1. Tenta `DATABASE_URL` (variável manual ou referência Railway)
+2. Fallback: constrói URL a partir de `PGHOST` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGPORT` (injetados automaticamente)
+3. Fallback final: SQLite local (apenas desenvolvimento)
+
+### Dados iniciais — `fixtures_inicial.json`
+
+Arquivo na raiz do projeto com 14 registros exportados do SQLite local:
+- `auth.user` — admin, Edilsonmn
+- `core.perfilusuario` — perfis dos dois usuários
+- `core.sistema`, `core.cliente`, `core.projeto`
+- `core.chamado`, `core.resposta`, `core.anexo`
+- `core.configuraremail`
+
+O Procfile carrega o fixture automaticamente no startup **se o banco estiver vazio** (sem usuários), evitando perda de acesso após redeploys.
+
+### Procfile
+
+```
+web: mkdir -p static staticfiles && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py shell -c "from django.contrib.auth.models import User; User.objects.exists() or __import__('os').system('python manage.py loaddata fixtures_inicial.json')" && gunicorn setup.wsgi --bind 0.0.0.0:$PORT
+```
+
+### Problemas resolvidos durante o deploy
+
+| Problema | Causa | Solução |
+|---|---|---|
+| Python 3.13 incompatível | `cgi` module removido no 3.13; Django 3.2 usa `cgi` | `.python-version` com `3.11` |
+| Attestation failure do mise | mise v2026 exige attestations para versões patch exatas | Usar versão minor `3.11` sem patch |
+| `dj-database-url` conflito | versão 2.x e 3.x exigem Django ≥ 4.2 | Remover lib; parsear `DATABASE_URL` com `urllib.parse` nativo |
+| `ALLOWED_HOSTS` ignorado | Variáveis manuais não estavam sendo aplicadas | Usar `RAILWAY_PUBLIC_DOMAIN` injetado automaticamente |
+| Dados perdidos a cada redeploy | `DATABASE_URL` não resolvido → SQLite apagado no container | Fallback `PGHOST`/`PGUSER` + auto-loaddata no Procfile |
+| Worker timeout ao testar e-mail | Conexão SMTP travada (sem timeout) derrubava o Gunicorn | `timeout=15` no `get_connection()` |
+
+---
+
+## Estudo — E-mail SMTP em Produção (Railway)
+
+### Problema identificado
+
+O envio de e-mail via `smtp.zoho.com:465` funciona perfeitamente no ambiente de desenvolvimento local mas **falha em produção no Railway** com worker timeout do Gunicorn.
+
+**Diagnóstico:** A conexão TCP para `smtp.zoho.com:465` **trava indefinidamente** sem receber resposta (nem recusa, nem erro). O Zoho bloqueia silenciosamente ranges de IP de provedores cloud (AWS, Railway, GCP, Azure) para evitar spam. Em produção com Railway (infraestrutura AWS US-West), os pacotes são descartados pelo firewall do Zoho sem retorno.
+
+**Evidência no log:**
+```
+[CRITICAL] WORKER TIMEOUT (pid:37)   ← worker morto após 5 min tentando conectar ao SMTP
+```
+
+**Por que funciona local:** IP residencial/comercial é aceito pelo Zoho. IP de cloud é bloqueado.
+
+### O que foi tentado / descartado
+
+| Tentativa | Resultado |
+|---|---|
+| Senha de aplicativo Zoho | Descartado — credenciais estão corretas (funciona local) |
+| IMAP/SMTP habilitado na conta | Descartado — mesma razão |
+| Políticas da organização Zoho | Descartado — mesma razão |
+| Porta 465 SSL → 587 TLS | Não testado (mesmo range de IP, provável mesmo bloqueio) |
+
+### Solução pendente — Zoho ZeptoMail
+
+O **Zoho ZeptoMail** é o produto da própria Zoho criado especificamente para envio de e-mail transacional a partir de aplicações/servidores hospedados em cloud. Usa infraestrutura diferente do Zoho Mail pessoal/corporativo e não sofre o bloqueio de IP.
+
+| Item | Valor |
+|---|---|
+| Produto | Zoho ZeptoMail |
+| Site | `zeptomail.zoho.com` |
+| Plano gratuito | 10.000 e-mails/mês |
+| Servidor SMTP | `smtp.zeptomail.com` |
+| Porta | 587 (TLS) |
+| Autenticação | Token de API gerado no painel ZeptoMail |
+
+**Passos para implementar:**
+1. Criar conta em `zeptomail.zoho.com` (gratuito)
+2. Adicionar e verificar o domínio `anagma.com.br`
+3. Gerar o token SMTP
+4. Atualizar a configuração SMTP no sistema: servidor `smtp.zeptomail.com`, porta `587`, TLS habilitado, usuário e senha gerados pelo ZeptoMail
+5. Atualizar `fixtures_inicial.json` com a nova configuração
+
+**Alternativa:** Brevo (antigo Sendinblue) — 300 e-mails/dia grátis, SMTP `smtp-relay.brevo.com:587`, funciona em cloud sem restrição.
