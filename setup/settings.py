@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
     'core',
 ]
 
@@ -171,3 +173,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SITE_URL = os.environ.get('SITE_URL', f'https://{_railway_domain}' if _railway_domain else '')
+
+# Cloudinary — armazenamento de mídia persistente em produção
+# Variáveis definidas no Railway: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+_cloudinary_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
+if _cloudinary_name:
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': _cloudinary_name,
+        'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+        'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+    }
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

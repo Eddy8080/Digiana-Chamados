@@ -6,3 +6,5 @@ Pillow==12.2.0
 gunicorn==21.2.0
 whitenoise==6.8.2
 psycopg2-binary==2.9.12
+cloudinary==1.44.2
+django-cloudinary-storage==0.3.0
