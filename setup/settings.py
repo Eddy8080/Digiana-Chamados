@@ -23,9 +23,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-fx_t=626j*-%p6czdk&zv9*sae*ky%^ev8slma87udp28)-xyp')
 
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Railway injeta RAILWAY_ENVIRONMENT_NAME automaticamente; usa isso para default seguro
+_on_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT_NAME'))
+DEBUG = os.environ.get('DEBUG', 'False' if _on_railway else 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Railway injeta RAILWAY_PUBLIC_DOMAIN automaticamente; garante que o host seja permitido
+_railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+_default_hosts = f'localhost,127.0.0.1,{_railway_domain}' if _railway_domain else 'localhost,127.0.0.1'
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',')
 
 
 # Application definition
@@ -134,8 +139,4 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# URL pública do sistema — usado nos links enviados por e-mail.
-# Deixe vazio para usar a URL da requisição (desenvolvimento local).
-# Quando o deploy estiver pronto, coloque aqui a URL do Netlify/servidor:
-# Exemplo: SITE_URL = 'https://digiana.netlify.app'
-SITE_URL = os.environ.get('SITE_URL', '')
+SITE_URL = os.environ.get('SITE_URL', f'https://{_railway_domain}' if _railway_domain else '')
