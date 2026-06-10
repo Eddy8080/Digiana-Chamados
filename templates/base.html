@@ -509,7 +509,9 @@
                     btn.style.opacity = '1';
                     if (!data.ok) return;
                     var url = data.url + '?t=' + Date.now();
-                    btn.innerHTML = '<img id="nav-avatar-img" src="' + url + '" class="w-8 h-8 rounded-full object-cover">';
+                    var ini = '{{ user.get_full_name|default:user.username|slice:":1"|upper }}';
+                    btn.innerHTML = '<img id="nav-avatar-img" src="' + url + '" class="w-8 h-8 rounded-full object-cover" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+                                  + '<div id="nav-avatar-ini" style="display:none" class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold select-none">' + ini + '</div>';
                 })
                 .catch(function () { btn.style.opacity = '1'; });
         });
