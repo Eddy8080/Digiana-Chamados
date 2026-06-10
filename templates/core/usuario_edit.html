@@ -26,7 +26,9 @@
             <div class="flex flex-col items-center gap-3 pb-2">
                 <div id="foto-preview-wrap" class="w-20 h-20 rounded-full overflow-hidden bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold select-none">
                     {% if usuario.perfil.foto %}
-                    <img id="foto-preview-img" src="{{ usuario.perfil.foto.url }}" class="w-full h-full object-cover">
+                    <img id="foto-preview-img" src="{{ usuario.perfil.foto.url }}" class="w-full h-full object-cover"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+                    <span id="foto-inicial" style="display:none">{{ usuario.first_name|first|upper|default:usuario.username|first|upper }}</span>
                     {% else %}
                     <span id="foto-inicial">{{ usuario.first_name|first|upper|default:usuario.username|first|upper }}</span>
                     {% endif %}

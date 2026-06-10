@@ -38,7 +38,11 @@
                         <div class="flex items-center gap-2">
                             {% if u.perfil and u.perfil.foto %}
                             <img src="{{ u.perfil.foto.url }}" alt=""
-                                 class="w-9 h-9 rounded-full object-cover flex-shrink-0">
+                                 class="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                            <div style="display:none" class="w-9 h-9 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
+                                {{ u.first_name|first|default:u.username|first }}
+                            </div>
                             {% else %}
                             <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
                                 {{ u.first_name|first|default:u.username|first }}

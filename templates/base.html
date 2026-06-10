@@ -369,7 +369,12 @@
                                 class="relative rounded-full ring-2 ring-transparent hover:ring-blue-400 focus:outline-none focus:ring-blue-400 transition-all shrink-0">
                             {% if user.perfil.foto %}
                             <img id="nav-avatar-img" src="{{ user.perfil.foto.url }}"
-                                 class="w-8 h-8 rounded-full object-cover">
+                                 class="w-8 h-8 rounded-full object-cover"
+                                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                            <div id="nav-avatar-ini" style="display:none"
+                                 class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold select-none">
+                                {{ user.get_full_name|default:user.username|slice:":1"|upper }}
+                            </div>
                             {% else %}
                             <div id="nav-avatar-ini"
                                  class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold select-none">
