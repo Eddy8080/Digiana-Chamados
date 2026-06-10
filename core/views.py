@@ -397,6 +397,7 @@ def disparar_email(assunto, mensagem, destinatarios):
             use_tls=config.use_tls,
             use_ssl=config.use_ssl,
             fail_silently=False,
+            timeout=15,
         )
         email = EmailMessage(
             subject=assunto,
