@@ -1,0 +1,187 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$4DIS9zN3EpgEgY7vLSCmnN$bC58Atuel1nbqQ8CQarZ2AexB7burRjSXjZPpDRq2hA=",
+    "last_login": "2026-06-10T18:59:20.625Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "Edilson",
+    "last_name": "Neto",
+    "email": "edilsonmn45@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-06-08T19:00:50.154Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$YV3YSy13KUY4jU79LSViQV$JrTuzSMHuuQZjKoK4EPFu28tmWiPARFT/FKQm4hLU90=",
+    "last_login": "2026-06-10T19:00:00.697Z",
+    "is_superuser": false,
+    "username": "Edilsonmn",
+    "first_name": "Edilson",
+    "last_name": "Monteiro Neto",
+    "email": "edilson.monteiro@anagma.com.br",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-08T20:49:36.067Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "ej9kau699thn1efqe1k9x2nt83ivd7t8",
+  "fields": {
+    "session_data": ".eJxVjDsOwyAQBe9CHSH-XqdM7zMgYJfgJALJ2FWUu0dILpL2zcx7Mx-Ovfij0-ZXZFcm2eV3iyE9qQ6Aj1DvjadW922NfCj8pJ0vDel1O92_gxJ6GbXDlBAAYtY0G6OykMra7CwpG3KAKBSSnixqBAeGhJgJpFNJWBP1xD5f8yY3rQ:1wWfdw:oYxaXVjR1rXw2S7e0QyACPGC89We7AhWqKu3Su8gHYw",
+    "expire_date": "2026-06-22T19:28:16.623Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "kbsrhrm9a20ke1o3ew3308ypthb5f3hg",
+  "fields": {
+    "session_data": ".eJxVjMsOwiAQRf-FtSFMoTxcuvcbyDBDpWogKe3K-O_apAvd3nPOfYmI21ri1vMSZxZnAeL0uyWkR6474DvWW5PU6rrMSe6KPGiX18b5eTncv4OCvXxr9MZZNN4ZRB4CowZtrbeK1aSnURF5AusgBM7egFLIDtKowISBrCbx_gDLYzcJ:1wXKG4:UcKr929yayXO8k8UHuby0U0LxagqknIkuL-yOL5R4EQ",
+    "expire_date": "2026-06-24T14:50:20.585Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "m8y0wemdp4fw73hkjce9sepkz29d8i2c",
+  "fields": {
+    "session_data": ".eJxVjMsOwiAQRf-FtSFMoTxcuvcbyDBDpWogKe3K-O_apAvd3nPOfYmI21ri1vMSZxZnAeL0uyWkR6474DvWW5PU6rrMSe6KPGiX18b5eTncv4OCvXxr9MZZNN4ZRB4CowZtrbeK1aSnURF5AusgBM7egFLIDtKowISBrCbx_gDLYzcJ:1wXKFP:iH0nFrMhStXwQQuZ5ohiD1Ld0xTueOTs1d0XiQNZ4vo",
+    "expire_date": "2026-06-24T14:49:39.045Z"
+  }
+},
+{
+  "model": "core.sistema",
+  "pk": 1,
+  "fields": {
+    "nome": "Digiana Inteligência Artificial",
+    "descricao": "Software de inteligência Artificial.",
+    "ativo": true,
+    "criado_em": "2026-06-10T11:44:02.255Z"
+  }
+},
+{
+  "model": "core.cliente",
+  "pk": 2,
+  "fields": {
+    "nome": "Anagma Contabilidade",
+    "cpf_cnpj": "14.890.973/0001-58",
+    "email": "contato@anagma.com.br",
+    "telefone": "71-33211993",
+    "criado_em": "2026-06-10T17:34:06.694Z"
+  }
+},
+{
+  "model": "core.projeto",
+  "pk": 2,
+  "fields": {
+    "cliente": 2,
+    "nome": "Digiana Inteligência Artificial",
+    "descricao": "Projeto sendo construído para ser um auxiliar de contabilidade.",
+    "criado_em": "2026-06-10T17:34:41.860Z"
+  }
+},
+{
+  "model": "core.chamado",
+  "pk": 3,
+  "fields": {
+    "projeto": 2,
+    "titulo": "Desenvolvimento de software",
+    "descricao": "<p>Busco informações do status de desenvolvimento.</p>",
+    "status": "pendente",
+    "prioridade": "media",
+    "sistema": null,
+    "responsavel": [
+      "Edilsonmn"
+    ],
+    "criado_por": [
+      "admin"
+    ],
+    "criado_em": "2026-06-10T17:38:49.381Z",
+    "atualizado_em": "2026-06-10T17:40:58.626Z",
+    "observadores": []
+  }
+},
+{
+  "model": "core.perfilusuario",
+  "pk": 1,
+  "fields": {
+    "user": [
+      "Edilsonmn"
+    ],
+    "role": "dev",
+    "must_change_password": false,
+    "cliente": null,
+    "celular": null,
+    "whatsapp": null,
+    "telefone_fixo": null,
+    "email_verificar": false,
+    "foto": "avatares/3x4_9cw6Eo2.jpeg"
+  }
+},
+{
+  "model": "core.perfilusuario",
+  "pk": 2,
+  "fields": {
+    "user": [
+      "admin"
+    ],
+    "role": "diretor_ti",
+    "must_change_password": false,
+    "cliente": null,
+    "celular": null,
+    "whatsapp": null,
+    "telefone_fixo": null,
+    "email_verificar": false,
+    "foto": ""
+  }
+},
+{
+  "model": "core.configuraremail",
+  "pk": 1,
+  "fields": {
+    "servidor_smtp": "smtp.zoho.com",
+    "porta": 465,
+    "usuario": "edilson.monteiro@anagma.com.br",
+    "senha": "Linux@44",
+    "use_tls": false,
+    "use_ssl": true,
+    "atualizado_em": "2026-06-10T14:48:07.763Z"
+  }
+},
+{
+  "model": "core.resposta",
+  "pk": 8,
+  "fields": {
+    "chamado": 3,
+    "autor": [
+      "Edilsonmn"
+    ],
+    "conteudo": "<p>O status está em 50%</p>",
+    "criado_em": "2026-06-10T17:40:16.487Z",
+    "resposta_pai": null
+  }
+},
+{
+  "model": "core.anexo",
+  "pk": 1,
+  "fields": {
+    "chamado": 3,
+    "resposta": null,
+    "arquivo": "chamados/3/anexos/Digiana__Manual_de_Arquitetura.pdf",
+    "nome_original": "Digiana — Manual de Arquitetura.pdf",
+    "tipo_mime": "application/pdf",
+    "criado_em": "2026-06-10T17:38:49.406Z",
+    "criado_por": [
+      "admin"
+    ]
+  }
+}
+]
