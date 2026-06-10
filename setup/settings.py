@@ -84,6 +84,8 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
 _db_url = os.environ.get('DATABASE_URL')
+_pg_host = os.environ.get('PGHOST')
+
 if _db_url:
     _u = urllib.parse.urlparse(_db_url)
     DATABASES = {
@@ -94,6 +96,19 @@ if _db_url:
             'PASSWORD': _u.password,
             'HOST': _u.hostname,
             'PORT': str(_u.port or 5432),
+            'CONN_MAX_AGE': 600,
+        }
+    }
+elif _pg_host:
+    # Railway injeta PGHOST/PGUSER/PGPASSWORD/PGDATABASE/PGPORT automaticamente
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('PGDATABASE', ''),
+            'USER': os.environ.get('PGUSER', ''),
+            'PASSWORD': os.environ.get('PGPASSWORD', ''),
+            'HOST': _pg_host,
+            'PORT': os.environ.get('PGPORT', '5432'),
             'CONN_MAX_AGE': 600,
         }
     }
