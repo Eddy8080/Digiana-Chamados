@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Usuário — Digiana{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Cadastrar Usuário</h1>
+        <p class="text-slate-500 mt-1 text-sm">Crie um novo acesso ao sistema. Apenas administradores podem realizar esta ação.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-blue-500 flex-shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+            <span class="text-sm font-semibold text-slate-600">Dados do novo usuário</span>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            <!-- ── Foto de perfil ── -->
+            <div class="flex flex-col items-center gap-3 pb-2">
+                <div id="foto-preview-wrap" class="w-20 h-20 rounded-full overflow-hidden bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold select-none">
+                    <span id="foto-inicial">?</span>
+                </div>
+                <label for="id_foto" class="cursor-pointer text-sm font-semibold text-blue-600 hover:text-blue-700 transition">
+                    Adicionar foto de perfil
+                    <span class="font-normal text-slate-400">(opcional)</span>
+                </label>
+                <input type="file" name="foto" id="id_foto" accept="image/*" class="sr-only">
+            </div>
+
+            {% for field in form %}
+
+            {% if field.html_name == 'foto' %}
+            {# já renderizado acima #}
+
+            {% elif field.html_name == 'role' %}
+            <!-- ── Barra de seleção de perfil ── -->
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-3">Perfil de acesso</label>
+                <div class="grid grid-cols-2 gap-2" id="role-bar">
+                    {% for choice_value, choice_label in field.field.choices %}
+                    <label class="role-card flex items-start gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all
+                                  {% if field.value == choice_value %}border-blue-500 bg-blue-50{% else %}border-slate-200 hover:border-slate-300{% endif %}">
+                        <input type="radio"
+                               name="{{ field.html_name }}"
+                               value="{{ choice_value }}"
+                               class="sr-only"
+                               {% if field.value == choice_value %}checked{% endif %}>
+                        <span class="role-check mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all
+                                     {% if field.value == choice_value %}border-blue-500 bg-blue-500{% else %}border-slate-300{% endif %}">
+                            <svg class="w-2.5 h-2.5 text-white {% if field.value != choice_value %}hidden{% endif %}" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414 0L8 12.586 4.707 9.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8a1 1 0 000-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                        </span>
+                        <span class="flex flex-col">
+                            <span class="role-label text-sm font-semibold leading-snug
+                                         {% if field.value == choice_value %}text-blue-700{% else %}text-slate-700{% endif %}">
+                                {{ choice_label }}
+                            </span>
+                            <span class="text-xs text-slate-400 mt-0.5 leading-snug">
+                                    {% if choice_value == 'diretor_ti' %}
+                                    Painel completo — todos os chamados, editar, fechar e auditar.
+                                {% elif choice_value == 'diretor' or choice_value == 'coordenador' %}
+                                    Abre, edita e reabre chamados — não fecha. Sem acesso a usuários e e-mail.
+                                {% elif choice_value == 'usr' %}
+                                    Somente os próprios chamados — editar e reabrir chamado.
+                                {% else %}
+                                    Dashboard, clientes e projetos — todos os chamados, editar e fechar.
+                                {% endif %}
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if field.errors %}
+                <p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>
+                {% endif %}
+            </div>
+
+            {% elif field.html_name == 'cliente' %}
+            <!-- ── Vínculo com cliente ── -->
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                {{ field }}
+                <p class="text-xs text-slate-400 mt-1">Deixe em branco para usuários internos (equipe).</p>
+                {% if field.errors %}<p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>{% endif %}
+            </div>
+
+            {% elif field.html_name == 'celular' %}
+            <!-- ── Seção de contatos ── -->
+            <div class="pt-2 border-t border-slate-100">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Contatos <span class="font-normal normal-case">(opcional)</span></p>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>{% endif %}
+            </div>
+
+            {% elif field.html_name == 'whatsapp' or field.html_name == 'telefone_fixo' %}
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>{% endif %}
+            </div>
+
+            {% else %}
+            <!-- ── Campos de texto ── -->
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                <input type="{{ field.field.widget.input_type|default:'text' }}"
+                       name="{{ field.html_name }}"
+                       id="{{ field.id_for_label }}"
+                       value="{{ field.value|default:'' }}"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition">
+                {% if field.help_text %}
+                <p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>
+                {% endif %}
+                {% if field.errors %}
+                <p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>
+                {% endif %}
+            </div>
+
+            {% endif %}
+            {% endfor %}
+
+            <!-- Nota sobre senha automática -->
+            <div class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-0.5">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/>
+                </svg>
+                <span>Uma <strong>senha temporária aleatória</strong> será gerada e enviada por e-mail ao usuário. No primeiro acesso, o sistema exigirá a troca de senha.</span>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                <a href="{% url 'dashboard' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition">
+                    Cadastrar Usuário
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    var fotoInput = document.getElementById('id_foto');
+    var wrap      = document.getElementById('foto-preview-wrap');
+    var inicial   = document.getElementById('foto-inicial');
+    var nomeInput = document.getElementById('id_first_name');
+
+    function atualizarInicial() {
+        if (inicial && nomeInput) {
+            var v = nomeInput.value.trim();
+            inicial.textContent = v ? v[0].toUpperCase() : '?';
+        }
+    }
+    if (nomeInput) {
+        nomeInput.addEventListener('input', atualizarInicial);
+        atualizarInicial();
+    }
+
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                wrap.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+})();
+
+(function () {
+    var cards = document.querySelectorAll('#role-bar .role-card');
+
+    function activate(card) {
+        cards.forEach(function (c) {
+            c.classList.remove('border-blue-500', 'bg-blue-50');
+            c.classList.add('border-slate-200');
+            c.querySelector('.role-check').classList.remove('border-blue-500', 'bg-blue-500');
+            c.querySelector('.role-check').classList.add('border-slate-300');
+            c.querySelector('.role-check svg').classList.add('hidden');
+            c.querySelector('.role-label').classList.remove('text-blue-700');
+            c.querySelector('.role-label').classList.add('text-slate-700');
+        });
+        card.classList.add('border-blue-500', 'bg-blue-50');
+        card.classList.remove('border-slate-200');
+        card.querySelector('.role-check').classList.add('border-blue-500', 'bg-blue-500');
+        card.querySelector('.role-check').classList.remove('border-slate-300');
+        card.querySelector('.role-check svg').classList.remove('hidden');
+        card.querySelector('.role-label').classList.add('text-blue-700');
+        card.querySelector('.role-label').classList.remove('text-slate-700');
+    }
+
+    cards.forEach(function (card) {
+        var radio = card.querySelector('input[type="radio"]');
+        if (radio.checked) activate(card);
+        card.addEventListener('click', function () {
+            radio.checked = true;
+            activate(card);
+        });
+    });
+})();
+</script>
+{% endblock %}

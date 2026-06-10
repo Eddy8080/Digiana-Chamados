@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuários — Digiana{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-900">Usuários</h1>
+            <p class="text-slate-500 mt-1">Gerencie os acessos cadastrados no sistema.</p>
+        </div>
+        <a href="{% url 'cadastro' %}" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg transition">
+            Cadastrar Usuário
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <th class="px-4 py-3">Usuário</th>
+                    <th class="px-4 py-3">E-mail</th>
+                    <th class="px-4 py-3">Cliente</th>
+                    <th class="px-4 py-3">Cargo</th>
+                    <th class="px-4 py-3">Nível</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Cadastrado em</th>
+                    <th class="px-4 py-3">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-sm text-slate-600">
+                {% for u in usuarios %}
+                <tr class="hover:bg-slate-50/50 transition">
+
+                    <!-- Nome / Username -->
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            {% if u.perfil and u.perfil.foto %}
+                            <img src="{{ u.perfil.foto.url }}" alt=""
+                                 class="w-9 h-9 rounded-full object-cover flex-shrink-0">
+                            {% else %}
+                            <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
+                                {{ u.first_name|first|default:u.username|first }}
+                            </div>
+                            {% endif %}
+                            <div class="min-w-0">
+                                <p class="font-semibold text-slate-800 truncate max-w-[8rem]">
+                                    {% if u.get_full_name %}{{ u.get_full_name }}{% else %}{{ u.username }}{% endif %}
+                                </p>
+                                <p class="text-xs text-slate-400">@{{ u.username }}</p>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- E-mail -->
+                    <td class="px-4 py-3 max-w-[10rem] truncate text-slate-600">{{ u.email|default:"—" }}</td>
+
+                    <!-- Cliente -->
+                    <td class="px-4 py-3 max-w-[8rem] truncate">
+                        {% if u.perfil and u.perfil.cliente %}
+                            <span class="text-slate-700 font-medium">{{ u.perfil.cliente.nome }}</span>
+                        {% else %}
+                            <span class="text-slate-400">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Cargo -->
+                    <td class="px-4 py-3 max-w-[9rem] truncate text-xs">
+                        {% if u.perfil %}
+                            {{ u.perfil.get_role_display }}
+                        {% elif u.is_superuser %}
+                            Superusuário
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <!-- Nível de acesso -->
+                    <td class="px-4 py-3">
+                        {% if u.is_superuser %}
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Admin</span>
+                        {% elif u.perfil %}
+                            {% with nivel=u.perfil.role %}
+                            {% if nivel == 'diretor_ti' %}
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Admin</span>
+                            {% elif nivel == 'diretor' or nivel == 'coordenador' %}
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Gestor</span>
+                            {% elif nivel == 'dev' or nivel == 'analista' %}
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Dev</span>
+                            {% else %}
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Usuário</span>
+                            {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Status de senha / e-mail -->
+                    <td class="px-4 py-3">
+                        <div class="flex flex-col gap-1">
+                            {% if u.perfil and u.perfil.must_change_password %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 flex-shrink-0">
+                                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Troca pendente
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 flex-shrink-0">
+                                        <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
+                                    </svg>
+                                    OK
+                                </span>
+                            {% endif %}
+                            {% if u.perfil and u.perfil.email_verificar %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 flex-shrink-0">
+                                        <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z"/>
+                                        <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z"/>
+                                    </svg>
+                                    E-mail a verificar
+                                </span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Data cadastro -->
+                    <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{{ u.date_joined|date:"d/m/Y" }}</td>
+
+                    <!-- Ações -->
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'usuario_edit' u.pk %}"
+                               class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+                                    <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.263a1.75 1.75 0 0 0 0-2.474Z"/>
+                                    <path d="M4.75 3.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h6.5c.69 0 1.25-.56 1.25-1.25V9a.75.75 0 0 1 1.5 0v2.25A2.75 2.75 0 0 1 11.25 14h-6.5A2.75 2.75 0 0 1 2 11.25v-6.5A2.75 2.75 0 0 1 4.75 2H7a.75.75 0 0 1 0 1.5H4.75Z"/>
+                                </svg>
+                                Editar
+                            </a>
+                            {% if u != request.user and not u.is_superuser %}
+                            <form method="POST" action="{% url 'usuario_delete' u.pk %}"
+                                  onsubmit="return confirm('Excluir {{ u.get_full_name|default:u.username }}? Esta ação não pode ser desfeita.')">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+                                        <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.712Z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Excluir
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center text-slate-400">
+                        Nenhum usuário cadastrado.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-xs text-slate-500">
+                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                &nbsp;·&nbsp; {{ total }} usuário{{ total|pluralize }}
+            </p>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page=1" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">«</a>
+                <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">‹ Anterior</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white border border-blue-600">{{ num }}</span>
+                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a href="?page={{ num }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Próxima ›</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">»</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

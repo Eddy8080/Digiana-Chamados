@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Digiana{% endblock %}
+
+{% block content %}
+<style>
+    @keyframes stat-pop {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.12); }
+        100% { transform: scale(1); }
+    }
+    .stat-pop { animation: stat-pop 0.35s ease-out; }
+</style>
+
+<div class="space-y-8">
+
+    <!-- Topo Dashboard -->
+    <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between sm:items-center">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
+            <p class="text-slate-500 mt-1">Acompanhe e gerencie a evolução de chamados em aberto.</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- relógio em tempo real -->
+            <span id="live-badge" class="inline-flex items-center gap-2 text-sm font-medium text-slate-400">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span id="live-date" class="select-none"></span>
+                <span class="text-slate-500/60">|</span>
+                <span id="last-updated" class="font-mono tabular-nums select-none"></span>
+            </span>
+            <a href="{% url 'chamado_create' %}" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition flex items-center space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+                </svg>
+                <span>Novo Chamado</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Cards de Métricas -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+
+        <!-- Total -->
+        <div class="relative bg-gradient-to-br from-slate-700 to-slate-900 p-6 rounded-2xl shadow-lg overflow-hidden flex flex-col">
+            <div class="absolute -right-5 -top-5 w-24 h-24 rounded-full bg-white/5 pointer-events-none"></div>
+            <div class="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/5 pointer-events-none"></div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-200">
+                        <path fill-rule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Total</span>
+            </div>
+            <span id="stat-total" class="stat-number text-5xl font-black text-white leading-none">{{ total_chamados }}</span>
+            <span class="mt-2 text-xs text-slate-400">chamados</span>
+        </div>
+
+        <!-- Abertos -->
+        <div class="relative bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-2xl shadow-lg shadow-amber-500/30 overflow-hidden flex flex-col">
+            <div class="absolute -right-5 -top-5 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-white">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-semibold text-amber-100 uppercase tracking-wide">Abertos</span>
+            </div>
+            <span id="stat-abertos" class="stat-number text-5xl font-black text-white leading-none">{{ abertos }}</span>
+            <span class="mt-2 text-xs text-amber-100">aguardando</span>
+        </div>
+
+        <!-- Em Progresso -->
+        <div class="relative bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-2xl shadow-lg shadow-blue-500/30 overflow-hidden flex flex-col">
+            <div class="absolute -right-5 -top-5 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-white">
+                        <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-semibold text-blue-100 uppercase tracking-wide">Em Progresso</span>
+            </div>
+            <span id="stat-progresso" class="stat-number text-5xl font-black text-white leading-none">{{ em_progresso }}</span>
+            <span class="mt-2 text-xs text-blue-100">em atendimento</span>
+        </div>
+
+        <!-- Pendentes -->
+        <div class="relative bg-gradient-to-br from-purple-500 to-violet-700 p-6 rounded-2xl shadow-lg shadow-purple-500/30 overflow-hidden flex flex-col">
+            <div class="absolute -right-5 -top-5 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-white">
+                        <path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5-2.25A.75.75 0 0 1 7.75 7h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Zm4 0a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-semibold text-purple-100 uppercase tracking-wide">Pendentes</span>
+            </div>
+            <span id="stat-pendentes" class="stat-number text-5xl font-black text-white leading-none">{{ pendentes }}</span>
+            <span class="mt-2 text-xs text-purple-100">aguardando retorno</span>
+        </div>
+
+        <!-- Resolvidos -->
+        <div class="relative bg-gradient-to-br from-emerald-500 to-green-700 p-6 rounded-2xl shadow-lg shadow-emerald-500/30 overflow-hidden flex flex-col">
+            <div class="absolute -right-5 -top-5 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/10 pointer-events-none"></div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-white">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <span class="text-xs font-semibold text-emerald-100 uppercase tracking-wide">Resolvidos</span>
+            </div>
+            <span id="stat-resolvidos" class="stat-number text-5xl font-black text-white leading-none">{{ resolvidos }}</span>
+            <span class="mt-2 text-xs text-emerald-100">concluídos</span>
+        </div>
+
+    </div>
+
+    <!-- Tabela / Lista de Chamados Recentes -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 class="text-lg font-bold text-slate-800">Chamados Recentes</h2>
+            <a href="{% url 'chamados_list' %}" class="text-sm font-semibold text-blue-600 hover:text-blue-700 transition">Ver todos →</a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                        <th class="px-6 py-4">ID</th>
+                        <th class="px-6 py-4">Título</th>
+                        <th class="px-6 py-4">Projeto</th>
+                        <th class="px-6 py-4">Prioridade</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Responsável</th>
+                        <th class="px-6 py-4">Data</th>
+                        <th class="px-6 py-4"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm text-slate-600">
+                    {% for chamado in chamados %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">#{{ chamado.id }}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-800">{{ chamado.titulo }}</td>
+                        <td class="px-6 py-4">{{ chamado.projeto.nome }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if chamado.prioridade == 'alta' %}bg-rose-50 text-rose-700{% elif chamado.prioridade == 'media' %}bg-amber-50 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ chamado.get_prioridade_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if chamado.status == 'aberto' %}bg-amber-50 text-amber-700
+                                {% elif chamado.status == 'em_progresso' %}bg-blue-50 text-blue-700
+                                {% elif chamado.status == 'pendente' %}bg-purple-50 text-purple-700
+                                {% elif chamado.status == 'resolvido' %}bg-emerald-50 text-emerald-700
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ chamado.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if chamado.responsavel %}
+                                {{ chamado.responsavel.username }}
+                            {% else %}
+                                <span class="text-slate-400 italic">Não atribuído</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">{{ chamado.criado_em|date:"d/m/Y H:i" }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2 justify-end">
+                                <a href="{% url 'chamado_detail' chamado.id %}"
+                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 transition">
+                                    Detalhar
+                                </a>
+                                {% if user_role == 'admin' %}
+                                <form method="POST" action="{% url 'chamado_delete' chamado.id %}"
+                                      onsubmit="return confirm('Excluir o chamado #{{ chamado.id }}?\n\nEsta ação não pode ser desfeita.')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+                                            <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.712Z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Excluir
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-slate-400">
+                            Nenhum chamado registrado no momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginação -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-xs text-slate-500">
+                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            </p>
+            <div class="flex items-center gap-1">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}"
+                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                    ‹ Anterior
+                </a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white border border-blue-600">{{ num }}</span>
+                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                    <a href="?page={{ num }}"
+                       class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                        {{ num }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}"
+                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                    Próxima ›
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<script>
+// relógio e data em tempo real — atualiza a cada segundo
+(function () {
+    const elHora = document.getElementById('last-updated');
+    const elData = document.getElementById('live-date');
+    function tick() {
+        const now = new Date();
+        elHora.textContent = now.toLocaleTimeString('pt-BR', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        elData.textContent = now.toLocaleDateString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+
+(function () {
+    const INTERVAL = 15000;
+    const URL = '{% url "dashboard_stats" %}';
+
+    const els = {
+        total:      document.getElementById('stat-total'),
+        abertos:    document.getElementById('stat-abertos'),
+        progresso:  document.getElementById('stat-progresso'),
+        pendentes:  document.getElementById('stat-pendentes'),
+        resolvidos: document.getElementById('stat-resolvidos'),
+    };
+
+    function pop(el) {
+        el.classList.remove('stat-pop');
+        void el.offsetWidth; // reflow para reiniciar animação
+        el.classList.add('stat-pop');
+    }
+
+    function setVal(el, newVal) {
+        const current = parseInt(el.textContent, 10);
+        if (!isNaN(current) && current !== newVal) {
+            el.textContent = newVal;
+            pop(el);
+        }
+    }
+
+    function poll() {
+        fetch(URL)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                setVal(els.total,      data.total);
+                setVal(els.abertos,    data.abertos);
+                setVal(els.progresso,  data.em_progresso);
+                setVal(els.pendentes,  data.pendentes);
+                setVal(els.resolvidos, data.resolvidos);
+            })
+            .catch(function () { /* ignora falha silenciosamente */ });
+    }
+
+    // primeira chamada após 5 s; depois a cada 15 s
+    setTimeout(function () {
+        poll();
+        setInterval(poll, INTERVAL);
+    }, 5000);
+})();
+</script>
+{% endblock %}

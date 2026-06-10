@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuração de E-mail — Digiana{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Configuração de E-mail SMTP</h1>
+        <p class="text-slate-500 mt-1 text-sm">Defina o servidor responsável pelo envio automático de notificações de chamados.</p>
+    </div>
+
+    <!-- Card do formulário -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-blue-500 flex-shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+            <span class="text-sm font-semibold text-slate-600">Dados do servidor SMTP</span>
+        </div>
+
+        <form method="POST" autocomplete="off" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.servidor_smtp.label }}</label>
+                {{ form.servidor_smtp }}
+                {% if form.servidor_smtp.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.servidor_smtp.errors.as_text }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.porta.label }}</label>
+                {{ form.porta }}
+                <p class="text-xs text-slate-400 mt-1">Porta padrão: 587 (TLS) ou 465 (SSL)</p>
+                {% if form.porta.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.porta.errors.as_text }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.usuario.label }}</label>
+                {{ form.usuario }}
+                {% if form.usuario.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.usuario.errors.as_text }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.senha.label }}</label>
+                <div class="relative">
+                    {{ form.senha }}
+                    <button type="button" id="toggle-senha"
+                        class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition"
+                        tabindex="-1">
+                        <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                        <svg id="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                    </button>
+                </div>
+                {% if form.senha.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.senha.errors.as_text }}</p>{% endif %}
+            </div>
+
+            <div class="space-y-3">
+                <p class="text-sm font-semibold text-slate-700">Tipo de criptografia</p>
+                <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="pt-0.5">{{ form.use_ssl }}</div>
+                    <div>
+                        <label for="{{ form.use_ssl.id_for_label }}" class="block text-sm font-semibold text-slate-700 cursor-pointer">{{ form.use_ssl.label }}</label>
+                        <p class="text-xs text-slate-400">Conexão SSL direta. Configuração padrão do Zoho Mail (porta 465).</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="pt-0.5">{{ form.use_tls }}</div>
+                    <div>
+                        <label for="{{ form.use_tls.id_for_label }}" class="block text-sm font-semibold text-slate-700 cursor-pointer">{{ form.use_tls.label }}</label>
+                        <p class="text-xs text-slate-400">STARTTLS. Use apenas se o provedor não aceitar SSL na porta 465.</p>
+                    </div>
+                </div>
+                {% if form.non_field_errors %}<p class="text-xs text-rose-500">{{ form.non_field_errors.as_text }}</p>{% endif %}
+            </div>
+
+            <!-- Aviso Zoho -->
+            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mt-0.5 flex-shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+                <span>Para o <strong>Zoho Mail</strong>: servidor <strong>smtp.zoho.com</strong>, porta <strong>465</strong>, SSL ativado. Se tiver autenticação em dois fatores, gere uma <strong>senha de aplicativo</strong> em Minha Conta → Segurança → Senhas de Aplicativo.</span>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                <a href="{% url 'dashboard' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition">
+                    Salvar Configuração
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Card de Teste -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-500 flex-shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span class="text-sm font-semibold text-slate-600">Testar envio de e-mail</span>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-sm text-slate-500">Envia um e-mail de teste para verificar se a configuração SMTP está funcionando. O erro exato será exibido caso haja falha.</p>
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Destinatário do teste</label>
+                    <input type="email" id="email-teste-dest" placeholder="seu@email.com"
+                           value="{{ request.user.email }}"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition">
+                </div>
+                <button type="button" id="btn-testar-email"
+                        class="shrink-0 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition flex items-center gap-2">
+                    <svg id="icon-testar-normal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.155.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
+                    </svg>
+                    <svg id="icon-testar-loading" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 hidden animate-spin">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1"/>
+                    </svg>
+                    Enviar Teste
+                </button>
+            </div>
+
+            <!-- Resultado do teste -->
+            <div id="resultado-teste" class="hidden rounded-xl p-4 text-sm"></div>
+
+            <!-- Diagnóstico detalhado -->
+            <div id="diagnostico-detalhe" class="hidden mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 space-y-1"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    var toggleBtn = document.getElementById('toggle-senha');
+    var input = document.getElementById('{{ form.senha.id_for_label }}');
+    var iconEye = document.getElementById('icon-eye');
+    var iconSlash = document.getElementById('icon-eye-slash');
+    if (toggleBtn && input) {
+        toggleBtn.addEventListener('click', function () {
+            var visible = input.type === 'text';
+            input.type = visible ? 'password' : 'text';
+            iconEye.classList.toggle('hidden', !visible);
+            iconSlash.classList.toggle('hidden', visible);
+        });
+    }
+})();
+
+(function () {
+    var btn        = document.getElementById('btn-testar-email');
+    var destInput  = document.getElementById('email-teste-dest');
+    var resultDiv  = document.getElementById('resultado-teste');
+    var diagDiv    = document.getElementById('diagnostico-detalhe');
+    var iconNormal = document.getElementById('icon-testar-normal');
+    var iconLoad   = document.getElementById('icon-testar-loading');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        var dest = destInput.value.trim();
+        if (!dest) { alert('Informe o e-mail de destino.'); return; }
+
+        // estado: carregando
+        btn.disabled = true;
+        iconNormal.classList.add('hidden');
+        iconLoad.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
+        diagDiv.classList.add('hidden');
+
+        var formData = new FormData();
+        formData.append('destinatario', dest);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('{% url "testar_email" %}', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            resultDiv.classList.remove('hidden');
+            if (data.ok) {
+                resultDiv.className = 'rounded-xl p-4 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800';
+                resultDiv.innerHTML =
+                    '<strong>&#10003; E-mail enviado com sucesso!</strong><br>' +
+                    'Verifique a caixa de entrada (e spam) de <strong>' + data.destinatario + '</strong>.';
+            } else {
+                resultDiv.className = 'rounded-xl p-4 text-sm bg-rose-50 border border-rose-200 text-rose-800';
+                resultDiv.innerHTML =
+                    '<strong>&#10007; Falha no envio</strong><br>' +
+                    '<span class="font-mono text-xs break-all">' + escapeHtml(data.erro) + '</span>';
+            }
+            if (data.diagnostico) {
+                diagDiv.classList.remove('hidden');
+                var d = data.diagnostico;
+                diagDiv.innerHTML =
+                    '<div class="font-semibold text-slate-500 mb-1">Configuração usada:</div>' +
+                    '<div>Servidor: ' + escapeHtml(d.servidor) + ':' + d.porta + '</div>' +
+                    '<div>Usuário:  ' + escapeHtml(d.usuario) + '</div>' +
+                    '<div>SSL: ' + (d.ssl ? 'Sim' : 'Não') + '  |  TLS: ' + (d.tls ? 'Sim' : 'Não') + '</div>' +
+                    '<div>Senha configurada: ' + (d.senha_configurada ? 'Sim' : '<strong class="text-rose-600">Não</strong>') + '</div>';
+            }
+        })
+        .catch(function (err) {
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = 'rounded-xl p-4 text-sm bg-rose-50 border border-rose-200 text-rose-800';
+            resultDiv.innerHTML = '<strong>Erro de comunicação</strong><br><span class="font-mono text-xs">' + escapeHtml(String(err)) + '</span>';
+        })
+        .finally(function () {
+            btn.disabled = false;
+            iconNormal.classList.remove('hidden');
+            iconLoad.classList.add('hidden');
+        });
+    });
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+})();
+</script>
+{% endblock %}

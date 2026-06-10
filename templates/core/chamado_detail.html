@@ -1,0 +1,809 @@
+{% extends 'base.html' %}
+
+{% block title %}Chamado #{{ chamado.id }} - Digiana{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.css">
+<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+<style>
+    :root {
+        --ck-color-base-background:               #252528;
+        --ck-color-base-foreground:               #1e1e20;
+        --ck-color-base-border:                   #3f3f46;
+        --ck-color-base-text:                     #f1f5f9;
+        --ck-color-button-default-background:     transparent;
+        --ck-color-button-default-hover-background: #2d2d30;
+        --ck-color-button-default-active-background: #3f3f46;
+        --ck-color-button-on-background:          #3f3f46;
+        --ck-color-button-on-hover-background:    #52525b;
+        --ck-color-toolbar-background:            #1e1e20;
+        --ck-color-toolbar-border:                #3f3f46;
+        --ck-color-list-background:               #252528;
+        --ck-color-panel-background:              #252528;
+        --ck-color-panel-border:                  #3f3f46;
+        --ck-color-input-background:              #252528;
+        --ck-color-input-border:                  #3f3f46;
+        --ck-color-input-text:                    #f1f5f9;
+        --ck-color-labeled-field-label-background:#252528;
+        --ck-color-focus-border:                  #3b82f6;
+        --ck-color-shadow-drop:                   rgba(0,0,0,0.4);
+        --ck-color-shadow-inner:                  rgba(0,0,0,0.3);
+    }
+    html.light-mode {
+        --ck-color-base-background:               #ffffff;
+        --ck-color-base-foreground:               #f8fafc;
+        --ck-color-base-border:                   #e2e8f0;
+        --ck-color-base-text:                     #1e293b;
+        --ck-color-button-default-background:     transparent;
+        --ck-color-button-default-hover-background: #f1f5f9;
+        --ck-color-button-default-active-background: #e2e8f0;
+        --ck-color-button-on-background:          #e2e8f0;
+        --ck-color-button-on-hover-background:    #cbd5e1;
+        --ck-color-toolbar-background:            #f8fafc;
+        --ck-color-toolbar-border:                #e2e8f0;
+        --ck-color-list-background:               #ffffff;
+        --ck-color-panel-background:              #ffffff;
+        --ck-color-panel-border:                  #e2e8f0;
+        --ck-color-input-background:              #ffffff;
+        --ck-color-input-border:                  #e2e8f0;
+        --ck-color-input-text:                    #1e293b;
+        --ck-color-labeled-field-label-background:#ffffff;
+        --ck-color-focus-border:                  #3b82f6;
+        --ck-color-shadow-drop:                   rgba(0,0,0,0.1);
+        --ck-color-shadow-inner:                  rgba(0,0,0,0.06);
+    }
+
+    /* ── CKEditor padrão (fora do campo unificado) ── */
+    .ck.ck-editor { border-radius:0.75rem !important; overflow:hidden; }
+    .ck.ck-toolbar { border-radius:0.75rem 0.75rem 0 0 !important; border-color:var(--ck-color-toolbar-border) !important; }
+    .ck.ck-editor__main > .ck-editor__editable {
+        border-radius:0 0 0.75rem 0.75rem !important;
+        border-color:var(--ck-color-base-border) !important;
+        min-height:160px; resize:vertical; overflow-y:auto;
+        color:var(--ck-color-base-text) !important;
+        background:var(--ck-color-base-background) !important;
+    }
+    .ck.ck-editor__main > .ck-editor__editable.ck-focused {
+        border-color:var(--ck-color-focus-border) !important;
+        box-shadow:0 0 0 3px rgba(59,130,246,0.12) !important;
+    }
+    .ck.ck-button { color:var(--ck-color-base-text) !important; }
+    .ck-editor__editable h2 { font-size:1.25rem; font-weight:700; margin:.5rem 0; }
+    .ck-editor__editable h3 { font-size:1.1rem;  font-weight:600; margin:.4rem 0; }
+    .ck-editor__editable ul { list-style:disc;    padding-left:1.5rem; }
+    .ck-editor__editable ol { list-style:decimal; padding-left:1.5rem; }
+    .ck-editor__editable blockquote { border-left:3px solid var(--ck-color-base-border); padding-left:.75rem; font-style:italic; color:#94a3b8; }
+    html.light-mode .ck-editor__editable blockquote { color:#64748b; }
+
+    /* ── Campo unificado (conversation-field) ── */
+    .conversation-field {
+        border: 1px solid var(--ck-color-base-border);
+        border-radius: 0.75rem;
+        background: var(--ck-color-base-background);
+        overflow-y: auto;
+        min-height: 180px;
+        max-height: 560px;
+    }
+    /* CKEditor dentro do campo unificado: remove bordas e radius próprios */
+    .conversation-field .ck.ck-editor {
+        border-radius: 0 !important;
+        overflow: visible !important;
+    }
+    .conversation-field .ck.ck-toolbar {
+        border-radius: 0 !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    .conversation-field .ck.ck-editor__main > .ck-editor__editable {
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        border-top-color: var(--ck-color-base-border) !important;
+        resize: none !important;
+        min-height: 120px !important;
+    }
+    /* Entradas de resposta dentro do campo */
+    .conv-reply {
+        border-top: 1px solid var(--ck-color-base-border);
+    }
+    html.light-mode .conv-reply {
+        border-top-color: #e2e8f0;
+    }
+    /* Editor de resposta (reply-editor): mesmo estilo, altura menor */
+    .reply-editor .ck.ck-editor { border-radius: 0.75rem !important; overflow: hidden !important; }
+    .reply-editor .ck.ck-toolbar { border-radius: 0.75rem 0.75rem 0 0 !important; }
+    .reply-editor .ck.ck-editor__main > .ck-editor__editable {
+        border-radius: 0 0 0.75rem 0.75rem !important;
+        border-color: var(--ck-color-base-border) !important;
+        min-height: 100px !important;
+        resize: vertical !important;
+    }
+</style>
+<style>
+    .chamado-descricao { font-size:.875rem; line-height:1.7; color:#cbd5e1; }
+    .chamado-descricao h2 { font-size:1.2rem; font-weight:700; color:#f1f5f9; margin:.9rem 0 .4rem; }
+    .chamado-descricao h3 { font-size:1.05rem; font-weight:600; color:#f1f5f9; margin:.7rem 0 .3rem; }
+    .chamado-descricao p  { margin:.45rem 0; }
+    .chamado-descricao ul { list-style:disc;    padding-left:1.4rem; margin:.45rem 0; }
+    .chamado-descricao ol { list-style:decimal; padding-left:1.4rem; margin:.45rem 0; }
+    .chamado-descricao li { margin:.2rem 0; }
+    .chamado-descricao strong { font-weight:600; color:#f1f5f9; }
+    .chamado-descricao em { font-style:italic; }
+    .chamado-descricao s  { text-decoration:line-through; }
+    .chamado-descricao a  { color:#60a5fa; text-decoration:underline; }
+    .chamado-descricao a:hover { color:#93c5fd; }
+    .chamado-descricao blockquote { border-left:3px solid #3f3f46; padding:.2rem .7rem; margin:.5rem 0; font-style:italic; color:#94a3b8; }
+    .chamado-descricao code { background:#2d2d30; padding:.1em .35em; border-radius:3px; font-family:ui-monospace,'Cascadia Code',monospace; font-size:.84em; color:#7dd3fc; }
+    .chamado-descricao pre { background:#2d2d30; padding:.75rem 1rem; border-radius:6px; overflow-x:auto; margin:.5rem 0; }
+    .chamado-descricao pre code { background:none; padding:0; color:#e2e8f0; }
+    .chamado-descricao img { max-width:100%; height:auto; border-radius:6px; margin:.5rem 0; cursor:zoom-in; }
+    .chamado-descricao table { border-collapse:collapse; width:100%; margin:.75rem 0; font-size:.875rem; }
+    .chamado-descricao th, .chamado-descricao td { border:1px solid #3f3f46; padding:.35rem .7rem; text-align:left; }
+    .chamado-descricao th { background:#2d2d30; font-weight:600; color:#f1f5f9; }
+    .obs-avatar { background:rgba(59,130,246,0.2); color:#93c5fd; }
+    .obs-nome   { color:#cbd5e1; }
+    .obs-row    { background:rgba(255,255,255,0.04); border-radius:.5rem; padding:.3rem .5rem; }
+    html.light-mode .obs-avatar { background:#dbeafe; color:#1d4ed8; }
+    html.light-mode .obs-nome   { color:#334155; }
+    html.light-mode .obs-row    { background:#f8fafc; }
+    html.light-mode .chamado-descricao { color:#475569; }
+    html.light-mode .chamado-descricao h2,
+    html.light-mode .chamado-descricao h3 { color:#1e293b; }
+    html.light-mode .chamado-descricao strong { color:#1e293b; }
+    html.light-mode .chamado-descricao a { color:#2563eb; }
+    html.light-mode .chamado-descricao a:hover { color:#1d4ed8; }
+    html.light-mode .chamado-descricao blockquote { border-color:#e2e8f0; color:#64748b; }
+    html.light-mode .chamado-descricao code { background:#f1f5f9; color:#0369a1; }
+    html.light-mode .chamado-descricao pre  { background:#f1f5f9; }
+    html.light-mode .chamado-descricao pre code { color:#374151; }
+    html.light-mode .chamado-descricao th { background:#f8fafc; color:#1e293b; }
+    html.light-mode .chamado-descricao th,
+    html.light-mode .chamado-descricao td { border-color:#e2e8f0; }
+    html.light-mode .conversation-field {
+        border-color: #e2e8f0;
+        background: #ffffff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <div>
+        <a href="javascript:history.back()"
+           class="text-sm text-slate-500 hover:text-slate-700 transition flex items-center space-x-1">
+            <span>&larr; Voltar</span>
+        </a>
+    </div>
+
+    <!-- ── Forms auxiliares ANTES do detail-form ── -->
+    {% if chamado.status == 'resolvido' or chamado.status == 'fechado' %}
+        {% if user_role == 'admin' or user_role == 'gestor' or user_role == 'dev' or chamado.criado_por == request.user %}
+        <form id="reopen-form" method="POST" action="{% url 'chamado_reopen' chamado.id %}" class="hidden">
+            {% csrf_token %}
+        </form>
+        {% endif %}
+    {% endif %}
+
+    {% if user_role == 'admin' or is_responsavel %}
+    <div id="painel-exclusao" class="hidden bg-rose-50 border border-rose-200 rounded-2xl p-5 space-y-3">
+        <div>
+            <h3 class="text-sm font-bold text-rose-700">Excluir Chamado #{{ chamado.id }}</h3>
+            <p class="text-xs text-rose-500 mt-0.5">Esta ação não pode ser desfeita.</p>
+        </div>
+        <form method="POST" action="{% url 'chamado_delete' chamado.id %}">
+            {% csrf_token %}
+            <textarea name="motivo" required rows="3" placeholder="Descreva o motivo da exclusão…"
+                      class="w-full px-3 py-2 text-sm border border-rose-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-400/30 resize-none bg-white text-slate-700 placeholder-slate-400 mb-3"></textarea>
+            <div class="flex gap-3 justify-end">
+                <button type="button" id="btn-cancelar-exclusao"
+                        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 font-semibold rounded-xl border border-slate-200 transition text-sm">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl transition text-sm">
+                    Confirmar Exclusão
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Header -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-2 text-xs font-mono text-slate-400">
+                    <span>ID #{{ chamado.id }}</span>
+                    <span>&bull;</span>
+                    <span>Criado em {{ chamado.criado_em|date:"d/m/Y H:i" }}</span>
+                </div>
+                {% if can_edit %}
+                <input type="text" name="titulo" form="detail-form" value="{{ chamado.titulo }}"
+                       class="mt-2 w-full text-2xl font-bold text-slate-900 bg-transparent border-0 border-b-2 border-transparent hover:border-slate-200 focus:border-blue-400 focus:outline-none transition px-0 py-1"
+                       required>
+                {% else %}
+                <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ chamado.titulo }}</h1>
+                {% endif %}
+                <div class="flex items-center flex-wrap gap-2 mt-1">
+                    <p class="text-slate-500 text-sm">
+                        Projeto: <strong class="text-slate-700">{{ chamado.projeto.nome }}</strong>
+                        ({{ chamado.projeto.cliente.nome }})
+                    </p>
+                    {% if is_observador %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+                            <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/>
+                            <path fill-rule="evenodd" d="M1.38 8.28a.87.87 0 0 1 0-.566 7.003 7.003 0 0 1 13.238.006.87.87 0 0 1 0 .566A7.003 7.003 0 0 1 1.379 8.28ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" clip-rule="evenodd"/>
+                        </svg>
+                        Observando
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                {% if can_edit %}
+                <button type="submit" form="detail-form"
+                        class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow shadow-blue-500/20 transition">
+                    Salvar Alterações
+                </button>
+                {% endif %}
+                {% if user_role == 'admin' or is_responsavel %}
+                <button type="button" id="btn-excluir-toggle"
+                        class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold rounded-xl border border-rose-200 transition">
+                    Excluir
+                </button>
+                {% endif %}
+                {% if chamado.status == 'resolvido' or chamado.status == 'fechado' %}
+                    {% if user_role == 'admin' or user_role == 'gestor' or user_role == 'dev' or chamado.criado_por == request.user %}
+                    <button type="submit" form="reopen-form"
+                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition">
+                        Reabrir Chamado
+                    </button>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Tempo -->
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between mb-3 gap-3">
+            <div>
+                <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wide">
+                    {% if encerrado %}Duração Total{% else %}Tempo em Aberto{% endif %}
+                </h2>
+                <span class="text-xs text-slate-400">horas úteis &mdash; seg&ndash;sex 08h&ndash;18h</span>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+                <span class="text-sm font-semibold
+                    {% if cor_barra == 'bg-emerald-500' %}text-emerald-600
+                    {% elif cor_barra == 'bg-blue-500' %}text-blue-600
+                    {% elif cor_barra == 'bg-amber-500' %}text-amber-600
+                    {% else %}text-rose-600{% endif %}">
+                    {{ tempo_decorrido }}
+                </span>
+                {% if user_role != 'usuario' and horas_extra > 0 %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+                        <path fill-rule="evenodd" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1ZM7.25 5a.75.75 0 0 1 1.5 0v2.75h1.5a.75.75 0 0 1 0 1.5h-2.25A.75.75 0 0 1 7.25 8.5V5Z" clip-rule="evenodd"/>
+                    </svg>
+                    + {{ tempo_extra }} extra
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div class="{{ cor_barra }} h-2.5 rounded-full transition-all duration-700"
+                 style="width:{{ progresso_pct }}%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-slate-400 mt-1.5">
+            <span>Aberto {{ chamado.criado_em|date:"d/m/Y" }}</span>
+            {% if encerrado %}<span>Encerrado {{ chamado.atualizado_em|date:"d/m/Y" }}</span>
+            {% else %}<span class="italic">Em andamento</span>{% endif %}
+        </div>
+    </div>
+
+    <!-- ── detail-form abre AQUI ── -->
+    {% if can_edit %}
+    <form id="detail-form" method="POST" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="projeto" value="{{ chamado.projeto.pk }}">
+        <input type="hidden" name="sistema" value="{{ chamado.sistema.pk|default:'' }}">
+    {% endif %}
+
+    <!-- Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- ── Coluna principal: Descrição + Conversa ── -->
+        <div class="md:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+
+            <!-- Cabeçalho do card -->
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-slate-800">Descrição do Problema</h2>
+                <span class="text-xs text-slate-400">
+                    {% with n=respostas|length %}
+                    {% if n == 0 %}Nenhuma interação
+                    {% elif n == 1 %}1 resposta
+                    {% else %}{{ n }} respostas{% endif %}
+                    {% endwith %}
+                </span>
+            </div>
+
+            <!-- Autor da mensagem original -->
+            <div class="px-6 pt-5 pb-3 flex items-center gap-3">
+                {% if chamado.criado_por.perfil.foto %}
+                <img src="{{ chamado.criado_por.perfil.foto.url }}" alt=""
+                     class="w-11 h-11 rounded-full object-cover shrink-0 select-none">
+                {% else %}
+                <div class="w-11 h-11 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0 select-none">
+                    {{ chamado.criado_por.get_full_name|default:chamado.criado_por.username|slice:":1"|upper }}
+                </div>
+                {% endif %}
+                <div class="flex items-center flex-wrap gap-2">
+                    <span class="font-semibold text-slate-800 text-sm">
+                        {{ chamado.criado_por.get_full_name|default:chamado.criado_por.username }}
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                        Solicitante
+                    </span>
+                    <span class="text-xs text-slate-400">{{ chamado.criado_em|date:"d/m/Y H:i" }}</span>
+                </div>
+            </div>
+
+            <!-- ── Campo unificado: descrição + respostas no mesmo campo ── -->
+            <div class="conversation-field mx-6">
+
+                <!-- Descrição -->
+                {% if can_edit %}
+                <textarea id="id_descricao" name="descricao">{{ chamado.descricao }}</textarea>
+                {% else %}
+                <div class="chamado-descricao p-4">{{ chamado.descricao|safe }}</div>
+                {% endif %}
+
+                <!-- Respostas dentro do mesmo campo -->
+                {% for resp in respostas %}
+                <div class="conv-reply px-4 py-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        {% if resp.autor and resp.autor.perfil.foto %}
+                        <img src="{{ resp.autor.perfil.foto.url }}" alt=""
+                             class="w-8 h-8 rounded-full object-cover shrink-0 select-none">
+                        {% else %}
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 select-none
+                            {% if resp.autor == chamado.criado_por %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {% if resp.autor %}{{ resp.autor.get_full_name|default:resp.autor.username|slice:":1"|upper }}{% else %}?{% endif %}
+                        </div>
+                        {% endif %}
+                        <span class="font-semibold text-slate-700 text-xs">
+                            {% if resp.autor %}{{ resp.autor.get_full_name|default:resp.autor.username }}
+                            {% else %}<span class="italic text-slate-400">Usuário removido</span>{% endif %}
+                        </span>
+                        {% if resp.autor == chamado.criado_por %}
+                        <span class="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">Solicitante</span>
+                        {% else %}
+                        <span class="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Equipe</span>
+                        {% endif %}
+                        <span class="text-xs text-slate-400">{{ resp.criado_em|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <div class="chamado-descricao pl-8">{{ resp.conteudo|safe }}</div>
+                    {% if resp.anexos.exists %}
+                    <div class="mt-3 pl-8 space-y-1.5">
+                        {% for anx in resp.anexos.all %}
+                        {% with n=anx.nome_original|lower %}
+                        <div class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-white border border-slate-100 text-xs">
+                            <span class="w-7 h-7 rounded-md flex items-center justify-center font-bold shrink-0
+                                {% if '.pdf' in n %}bg-red-100 text-red-700
+                                {% elif '.doc' in n %}bg-blue-100 text-blue-700
+                                {% elif '.xls' in n %}bg-emerald-100 text-emerald-700
+                                {% elif '.zip' in n or '.rar' in n %}bg-amber-100 text-amber-700
+                                {% elif '.jpg' in n or '.jpeg' in n or '.png' in n or '.gif' in n or '.webp' in n %}bg-purple-100 text-purple-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {% if '.pdf' in n %}PDF{% elif '.doc' in n %}DOC{% elif '.xls' in n %}XLS
+                                {% elif '.zip' in n %}ZIP{% elif '.rar' in n %}RAR
+                                {% elif '.jpg' in n or '.jpeg' in n %}JPG{% elif '.png' in n %}PNG
+                                {% else %}FILE{% endif %}
+                            </span>
+                            <span class="truncate text-slate-600 flex-1 min-w-0">{{ anx.nome_original }}</span>
+                            <a href="{{ anx.arquivo.url }}" download="{{ anx.nome_original }}"
+                               class="shrink-0 text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+                                    <path d="M8.75 2.75a.75.75 0 0 0-1.5 0v5.69L5.03 6.22a.75.75 0 0 0-1.06 1.06l3.5 3.5a.75.75 0 0 0 1.06 0l3.5-3.5a.75.75 0 0 0-1.06-1.06L8.75 8.44V2.75Z"/>
+                                    <path d="M3.5 9.75a.75.75 0 0 0-1.5 0v1.5A2.75 2.75 0 0 0 4.75 14h6.5A2.75 2.75 0 0 0 14 11.25v-1.5a.75.75 0 0 0-1.5 0v1.5c0 .69-.56 1.25-1.25 1.25h-6.5c-.69 0-1.25-.56-1.25-1.25v-1.5Z"/>
+                                </svg>
+                                Baixar
+                            </a>
+                        </div>
+                        {% endwith %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+            </div><!-- /conversation-field -->
+
+            <!-- Adicionar Anexos à descrição (can_edit) -->
+            {% if can_edit %}
+            <div class="px-6 pt-3 pb-2">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">
+                    Adicionar Anexos
+                    <span class="text-xs font-normal text-slate-400 ml-1">PDF, Word, Excel, imagens, ZIP… máx. 20 MB</span>
+                </label>
+                <input type="file" name="anexos" multiple
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp"
+                       class="block w-full text-sm text-slate-500
+                              file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                              file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100 cursor-pointer transition">
+            </div>
+            {% endif %}
+
+            <!-- Anexos existentes do chamado -->
+            {% if chamado_anexos %}
+            <div class="px-6 pb-3 space-y-2 {% if not can_edit %}pt-3{% endif %}">
+                {% for anexo in chamado_anexos %}
+                {% with nome=anexo.nome_original|lower %}
+                <div class="flex items-center justify-between py-2 px-3 rounded-xl border border-slate-100 hover:bg-slate-50/50 transition">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0
+                            {% if '.pdf' in nome %}bg-red-100 text-red-700
+                            {% elif '.doc' in nome %}bg-blue-100 text-blue-700
+                            {% elif '.xls' in nome %}bg-emerald-100 text-emerald-700
+                            {% elif '.zip' in nome or '.rar' in nome or '.7z' in nome %}bg-amber-100 text-amber-700
+                            {% elif '.jpg' in nome or '.jpeg' in nome or '.png' in nome or '.gif' in nome or '.webp' in nome %}bg-purple-100 text-purple-700
+                            {% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {% if '.pdf' in nome %}PDF
+                            {% elif '.docx' in nome %}DOC{% elif '.doc' in nome %}DOC
+                            {% elif '.xlsx' in nome %}XLS{% elif '.xls' in nome %}XLS
+                            {% elif '.zip' in nome %}ZIP{% elif '.rar' in nome %}RAR
+                            {% elif '.jpg' in nome or '.jpeg' in nome %}JPG
+                            {% elif '.png' in nome %}PNG
+                            {% elif '.txt' in nome %}TXT{% elif '.csv' in nome %}CSV
+                            {% else %}FILE{% endif %}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-slate-700 truncate">{{ anexo.nome_original }}</p>
+                            <p class="text-xs text-slate-400">
+                                {{ anexo.criado_em|date:"d/m/Y H:i" }}
+                                {% if anexo.criado_por %}&middot; {{ anexo.criado_por.get_full_name|default:anexo.criado_por.username }}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{{ anexo.arquivo.url }}" download="{{ anexo.nome_original }}"
+                       class="shrink-0 ml-3 px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                            <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/>
+                            <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/>
+                        </svg>
+                        Download
+                    </a>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- ── Área de nova resposta ── -->
+            <div class="px-6 pb-6 pt-4 border-t border-slate-100 mt-3">
+                <div class="flex items-start gap-3">
+                    {% if request.user.perfil.foto %}
+                    <img src="{{ request.user.perfil.foto.url }}" alt=""
+                         class="w-11 h-11 rounded-full object-cover shrink-0 select-none">
+                    {% else %}
+                    <div class="w-11 h-11 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0 select-none">
+                        {{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}
+                    </div>
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <div class="reply-editor">
+                            <textarea id="id_reply_conteudo" name="conteudo" form="reply-form"
+                                      placeholder="Escreva uma resposta…"></textarea>
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">
+                                    Anexar arquivo
+                                    <span class="font-normal text-slate-400">(opcional — PDF, imagens, ZIP… máx. 20 MB)</span>
+                                </label>
+                                <input type="file" name="anexos" form="reply-form" multiple
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp"
+                                       class="block w-full text-sm text-slate-500
+                                              file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0
+                                              file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700
+                                              hover:file:bg-slate-200 cursor-pointer transition">
+                            </div>
+                            <button type="submit" form="reply-form"
+                                    class="shrink-0 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow shadow-blue-500/20 transition">
+                                Enviar Resposta
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /coluna principal -->
+
+        <!-- Lateral / Metadados -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+            <h2 class="text-md font-bold text-slate-800 border-b border-slate-100 pb-2">Status & Atribuição</h2>
+            <div class="space-y-4 text-sm">
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Status</span>
+                    {% if can_edit and form.fields.status %}
+                    <select name="status"
+                            class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition">
+                        {% for val, label in form.fields.status.choices %}
+                        <option value="{{ val }}" {% if chamado.status == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold
+                        {% if chamado.status == 'aberto' %}bg-amber-50 text-amber-700
+                        {% elif chamado.status == 'em_progresso' %}bg-blue-50 text-blue-700
+                        {% elif chamado.status == 'pendente' %}bg-purple-50 text-purple-700
+                        {% elif chamado.status == 'resolvido' %}bg-emerald-50 text-emerald-700
+                        {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ chamado.get_status_display }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Prioridade</span>
+                    {% if can_edit %}
+                    <select name="prioridade"
+                            class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition">
+                        {% for val, label in chamado.PRIORIDADE_CHOICES %}
+                        <option value="{{ val }}" {% if chamado.prioridade == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold
+                        {% if chamado.prioridade == 'alta' %}bg-rose-50 text-rose-700
+                        {% elif chamado.prioridade == 'media' %}bg-amber-50 text-amber-700
+                        {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ chamado.get_prioridade_display }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Atribuído para</span>
+                    {% if can_edit and form.fields.responsavel %}
+                    {{ form.responsavel }}
+                    {% else %}
+                    <span class="block font-medium text-slate-700">
+                        {% if chamado.responsavel %}
+                            {{ chamado.responsavel.get_full_name|default:chamado.responsavel.username }}
+                        {% else %}
+                            <span class="text-slate-400 italic">Não Atribuído</span>
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Projeto</span>
+                    <span class="block font-medium text-slate-700">{{ chamado.projeto.nome }}</span>
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Sistema</span>
+                    <span class="block font-medium text-slate-700">
+                        {% if chamado.sistema %}{{ chamado.sistema.nome }}{% else %}<span class="text-slate-400 italic">Não informado</span>{% endif %}
+                    </span>
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Criado por</span>
+                    <span class="block font-medium text-slate-700">
+                        {{ chamado.criado_por.get_full_name|default:chamado.criado_por.username }}
+                    </span>
+                </div>
+
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-2">Observadores</span>
+                    {% if can_edit and form.fields.observadores %}
+                    <button type="button" id="obs-toggle"
+                            class="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-left text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 text-slate-400">
+                                <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+                                <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="font-semibold text-slate-700">Observadores</span>
+                            <span id="obs-count-badge" class="hidden px-1.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700"></span>
+                        </div>
+                        <svg id="obs-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                             class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200">
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                    <div id="obs-panel" class="hidden mt-1 border border-slate-200 rounded-lg overflow-hidden">
+                        <div class="px-2 py-2 border-b border-slate-100">
+                            <input type="text" id="obs-search" placeholder="Filtrar…" autocomplete="off"
+                                   class="w-full px-2 py-1.5 border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-400 transition">
+                        </div>
+                        <div id="obs-list" class="overflow-y-auto max-h-44 divide-y divide-slate-100">
+                            {% for checkbox in form.observadores %}
+                            <label class="obs-item flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50 transition select-none"
+                                   data-name="{{ checkbox.choice_label|lower }}">
+                                {{ checkbox.tag }}
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                                        {{ checkbox.choice_label|slice:":1"|upper }}
+                                    </div>
+                                    <span class="text-xs text-slate-700 truncate">{{ checkbox.choice_label }}</span>
+                                </div>
+                            </label>
+                            {% empty %}
+                            <p class="px-3 py-2 text-xs text-slate-400 italic">Nenhum usuário cadastrado.</p>
+                            {% endfor %}
+                        </div>
+                        <div class="px-3 py-1.5 border-t border-slate-100">
+                            <p id="obs-count" class="text-xs text-slate-400">Nenhum selecionado</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    {% with obs_list=chamado.observadores.all %}
+                    {% if obs_list %}
+                    <div class="flex flex-col gap-1.5">
+                        {% for obs in obs_list %}
+                        <div class="obs-row flex items-center gap-2">
+                            {% if obs.perfil.foto %}
+                            <img src="{{ obs.perfil.foto.url }}" alt=""
+                                 class="w-8 h-8 rounded-full object-cover shrink-0">
+                            {% else %}
+                            <div class="obs-avatar w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                                {{ obs.get_full_name|default:obs.username|slice:":1"|upper }}
+                            </div>
+                            {% endif %}
+                            <span class="obs-nome text-sm font-medium truncate">{{ obs.get_full_name|default:obs.username }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <span class="text-sm text-slate-400 italic">Nenhum</span>
+                    {% endif %}
+                    {% endwith %}
+                    {% endif %}
+                </div>
+
+            </div>
+        </div><!-- /lateral -->
+
+    </div><!-- /grid -->
+
+    {% if can_edit %}</form>{% endif %}
+
+    <!-- Reply form standalone -->
+    <form id="reply-form" method="POST" action="{% url 'chamado_responder' chamado.id %}"
+          enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+    </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var btn    = document.getElementById('btn-excluir-toggle');
+    var painel = document.getElementById('painel-exclusao');
+    var cancel = document.getElementById('btn-cancelar-exclusao');
+    if (!btn || !painel) return;
+    btn.addEventListener('click', function () {
+        painel.classList.toggle('hidden');
+        if (!painel.classList.contains('hidden')) painel.querySelector('textarea').focus();
+    });
+    if (cancel) cancel.addEventListener('click', function () {
+        painel.classList.add('hidden');
+        painel.querySelector('textarea').value = '';
+    });
+})();
+</script>
+
+{% if can_edit %}
+<script>
+(function () {
+    var textarea = document.getElementById('id_descricao');
+    if (!textarea) return;
+    ClassicEditor.create(textarea, {
+        simpleUpload: { uploadUrl: '/upload/imagem/' },
+        toolbar: { items: ['heading','|','bold','italic','underline','strikethrough','|','link','|','bulletedList','numberedList','|','blockQuote','code','|','imageUpload','|','insertTable','|','undo','redo'] },
+        heading: { options: [
+            { model: 'paragraph', title: 'Parágrafo', class: 'ck-heading_paragraph' },
+            { model: 'heading2', view: 'h2', title: 'Título 1', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Título 2', class: 'ck-heading_heading3' },
+        ]},
+        image: {
+            resizeUnit: '%',
+            resizeOptions: [
+                { name: 'resizeImage:original', value: null, label: 'Original' },
+                { name: 'resizeImage:50', value: '50', label: '50%' },
+                { name: 'resizeImage:75', value: '75', label: '75%' },
+            ],
+            toolbar: ['imageStyle:inline','imageStyle:block','|','resizeImage','|','imageTextAlternative']
+        },
+        table: { contentToolbar: ['tableColumn','tableRow','mergeTableCells'] }
+    }).then(function (editor) {
+        document.getElementById('detail-form').addEventListener('submit', function () {
+            textarea.value = editor.getData();
+        });
+    }).catch(function (err) { console.error('CKEditor desc:', err); });
+})();
+
+(function () {
+    var toggle  = document.getElementById('obs-toggle');
+    var panel   = document.getElementById('obs-panel');
+    var chevron = document.getElementById('obs-chevron');
+    var search  = document.getElementById('obs-search');
+    var countEl = document.getElementById('obs-count');
+    var badge   = document.getElementById('obs-count-badge');
+    var obsList = document.getElementById('obs-list');
+    if (!obsList || !toggle) return;
+    function openPanel()  { panel.classList.remove('hidden'); chevron.style.transform = 'rotate(180deg)'; }
+    function closePanel() { panel.classList.add('hidden');    chevron.style.transform = ''; }
+    toggle.addEventListener('click', function () {
+        panel.classList.contains('hidden') ? openPanel() : closePanel();
+    });
+    function updateCount() {
+        var n = obsList.querySelectorAll('input[type="checkbox"]:checked').length;
+        countEl.textContent = n === 0 ? 'Nenhum selecionado' : n === 1 ? '1 selecionado' : n + ' selecionados';
+        if (n > 0) { badge.textContent = n; badge.classList.remove('hidden'); }
+        else { badge.classList.add('hidden'); }
+        obsList.querySelectorAll('.obs-item').forEach(function (item) {
+            var cb = item.querySelector('input[type="checkbox"]');
+            if (cb && cb.checked) item.classList.add('bg-blue-50','border-l-2','border-blue-500');
+            else item.classList.remove('bg-blue-50','border-l-2','border-blue-500');
+        });
+    }
+    obsList.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', updateCount);
+    });
+    if (search) search.addEventListener('input', function () {
+        var q = this.value.toLowerCase().trim();
+        obsList.querySelectorAll('.obs-item').forEach(function (item) {
+            item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+        });
+    });
+    updateCount();
+    if (obsList.querySelectorAll('input[type="checkbox"]:checked').length > 0) openPanel();
+})();
+</script>
+{% endif %}
+
+<script>
+(function () {
+    var replyTA   = document.getElementById('id_reply_conteudo');
+    var replyForm = document.getElementById('reply-form');
+    if (!replyTA || !replyForm) return;
+    ClassicEditor.create(replyTA, {
+        simpleUpload: { uploadUrl: '/upload/imagem/' },
+        toolbar: { items: ['heading','|','bold','italic','underline','strikethrough','|','link','|','bulletedList','numberedList','|','blockQuote','code','|','imageUpload','|','insertTable','|','undo','redo'] },
+        heading: { options: [
+            { model: 'paragraph', title: 'Parágrafo', class: 'ck-heading_paragraph' },
+            { model: 'heading2', view: 'h2', title: 'Título 1', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Título 2', class: 'ck-heading_heading3' },
+        ]},
+        image: {
+            resizeUnit: '%',
+            resizeOptions: [
+                { name: 'resizeImage:original', value: null, label: 'Original' },
+                { name: 'resizeImage:50', value: '50', label: '50%' },
+                { name: 'resizeImage:75', value: '75', label: '75%' },
+            ],
+            toolbar: ['imageStyle:inline','imageStyle:block','|','resizeImage','|','imageTextAlternative']
+        },
+        table: { contentToolbar: ['tableColumn','tableRow','mergeTableCells'] }
+    }).then(function (editor) {
+        replyForm.addEventListener('submit', function () {
+            replyTA.value = editor.getData();
+        });
+    }).catch(function (err) { console.error('CKEditor reply:', err); });
+})();
+</script>
+{% endblock %}

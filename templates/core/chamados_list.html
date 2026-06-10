@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}Chamados - Digiana{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Topo -->
+    <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between sm:items-center">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-900">Chamados</h1>
+            <p class="text-slate-500 mt-1">
+                {% if total == 1 %}1 chamado encontrado{% else %}{{ total }} chamados encontrados{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'chamado_create' %}" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition">
+            Novo Chamado
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <form method="GET" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <div class="flex flex-wrap gap-3 items-end">
+
+            <!-- Busca -->
+            <div class="flex-1 min-w-48">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Buscar</label>
+                <input type="text" name="q" value="{{ q }}"
+                       placeholder="Título, projeto ou cliente…"
+                       class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition">
+            </div>
+
+            <!-- Status -->
+            <div class="min-w-40">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Status</label>
+                <select name="status" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition">
+                    <option value="">Todos</option>
+                    {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Prioridade -->
+            <div class="min-w-40">
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Prioridade</label>
+                <select name="prioridade" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition">
+                    <option value="">Todas</option>
+                    {% for val, label in prioridade_choices %}
+                    <option value="{{ val }}" {% if prioridade_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-2">
+                <button type="submit"
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition">
+                    Filtrar
+                </button>
+                {% if q or status_filter or prioridade_filter %}
+                <a href="{% url 'chamados_list' %}"
+                   class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold rounded-xl transition">
+                    Limpar
+                </a>
+                {% endif %}
+            </div>
+
+        </div>
+    </form>
+
+    <!-- Tabela -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                        <th class="px-6 py-4">ID</th>
+                        <th class="px-6 py-4">Título</th>
+                        <th class="px-6 py-4">Projeto</th>
+                        <th class="px-6 py-4">Cliente</th>
+                        <th class="px-6 py-4">Prioridade</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Responsável</th>
+                        <th class="px-6 py-4">Data</th>
+                        <th class="px-6 py-4"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm text-slate-600">
+                    {% for chamado in chamados %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">#{{ chamado.id }}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-800 max-w-xs truncate">{{ chamado.titulo }}</td>
+                        <td class="px-6 py-4">{{ chamado.projeto.nome }}</td>
+                        <td class="px-6 py-4 text-slate-500">{{ chamado.projeto.cliente.nome }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if chamado.prioridade == 'alta' %}bg-rose-50 text-rose-700
+                                {% elif chamado.prioridade == 'media' %}bg-amber-50 text-amber-700
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ chamado.get_prioridade_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if chamado.status == 'aberto' %}bg-amber-50 text-amber-700
+                                {% elif chamado.status == 'em_progresso' %}bg-blue-50 text-blue-700
+                                {% elif chamado.status == 'pendente' %}bg-purple-50 text-purple-700
+                                {% elif chamado.status == 'resolvido' %}bg-emerald-50 text-emerald-700
+                                {% elif chamado.status == 'fechado' %}bg-slate-100 text-slate-500
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ chamado.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if chamado.responsavel %}
+                                {{ chamado.responsavel.username }}
+                            {% else %}
+                                <span class="text-slate-400 italic">Não atribuído</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400 whitespace-nowrap">{{ chamado.criado_em|date:"d/m/Y H:i" }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2 justify-end">
+                                <a href="{% url 'chamado_detail' chamado.id %}"
+                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 transition">
+                                    Detalhar
+                                </a>
+                                {% if user_role == 'admin' %}
+                                <form method="POST" action="{% url 'chamado_delete' chamado.id %}"
+                                      class="flex items-center gap-1">
+                                    {% csrf_token %}
+                                    <input type="text" name="motivo" required
+                                           placeholder="Motivo…"
+                                           class="px-2 py-1.5 text-xs border border-rose-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-400/50 focus:border-rose-400 w-28 bg-rose-50/40 text-slate-700 placeholder-slate-400">
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
+                                            <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.712Z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Excluir
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="px-6 py-16 text-center">
+                            <p class="text-slate-400 text-sm">
+                                {% if q or status_filter or prioridade_filter %}
+                                    Nenhum chamado corresponde aos filtros aplicados.
+                                {% else %}
+                                    Nenhum chamado registrado no momento.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between px-2">
+        <p class="text-sm text-slate-500">
+            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            &nbsp;·&nbsp; {{ total }} chamado{{ total|pluralize }}
+        </p>
+        <div class="flex items-center gap-1">
+
+            {% if page_obj.has_previous %}
+            <a href="?page=1{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if prioridade_filter %}&prioridade={{ prioridade_filter }}{% endif %}"
+               class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                «
+            </a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if prioridade_filter %}&prioridade={{ prioridade_filter }}{% endif %}"
+               class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                ‹ Anterior
+            </a>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <span class="px-3 py-2 rounded-lg text-xs font-bold bg-blue-600 text-white border border-blue-600">
+                    {{ num }}
+                </span>
+                {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if prioridade_filter %}&prioridade={{ prioridade_filter }}{% endif %}"
+                   class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                    {{ num }}
+                </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if prioridade_filter %}&prioridade={{ prioridade_filter }}{% endif %}"
+               class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                Próxima ›
+            </a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if prioridade_filter %}&prioridade={{ prioridade_filter }}{% endif %}"
+               class="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                »
+            </a>
+            {% endif %}
+
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Digiana{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.css">
+<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+<style>
+    /* Theming CKEditor para Dark Mode (padrão do Digiana) */
+    :root {
+        --ck-color-base-background:               #252528;
+        --ck-color-base-foreground:               #1e1e20;
+        --ck-color-base-border:                   #3f3f46;
+        --ck-color-base-text:                     #f1f5f9;
+        --ck-color-button-default-background:     transparent;
+        --ck-color-button-default-hover-background: #2d2d30;
+        --ck-color-button-default-active-background: #3f3f46;
+        --ck-color-button-on-background:          #3f3f46;
+        --ck-color-button-on-hover-background:    #52525b;
+        --ck-color-toolbar-background:            #1e1e20;
+        --ck-color-toolbar-border:                #3f3f46;
+        --ck-color-list-background:               #252528;
+        --ck-color-panel-background:              #252528;
+        --ck-color-panel-border:                  #3f3f46;
+        --ck-color-input-background:              #252528;
+        --ck-color-input-border:                  #3f3f46;
+        --ck-color-input-text:                    #f1f5f9;
+        --ck-color-labeled-field-label-background:#252528;
+        --ck-color-focus-border:                  #3b82f6;
+        --ck-color-shadow-drop:                   rgba(0,0,0,0.4);
+        --ck-color-shadow-inner:                  rgba(0,0,0,0.3);
+    }
+    /* Light mode */
+    html.light-mode {
+        --ck-color-base-background:               #ffffff;
+        --ck-color-base-foreground:               #f8fafc;
+        --ck-color-base-border:                   #e2e8f0;
+        --ck-color-base-text:                     #1e293b;
+        --ck-color-button-default-background:     transparent;
+        --ck-color-button-default-hover-background: #f1f5f9;
+        --ck-color-button-default-active-background: #e2e8f0;
+        --ck-color-button-on-background:          #e2e8f0;
+        --ck-color-button-on-hover-background:    #cbd5e1;
+        --ck-color-toolbar-background:            #f8fafc;
+        --ck-color-toolbar-border:                #e2e8f0;
+        --ck-color-list-background:               #ffffff;
+        --ck-color-panel-background:              #ffffff;
+        --ck-color-panel-border:                  #e2e8f0;
+        --ck-color-input-background:              #ffffff;
+        --ck-color-input-border:                  #e2e8f0;
+        --ck-color-input-text:                    #1e293b;
+        --ck-color-labeled-field-label-background:#ffffff;
+        --ck-color-focus-border:                  #3b82f6;
+        --ck-color-shadow-drop:                   rgba(0,0,0,0.1);
+        --ck-color-shadow-inner:                  rgba(0,0,0,0.06);
+    }
+    /* Borda e arredondamento do editor */
+    .ck.ck-editor {
+        border-radius: 0.75rem !important;
+        overflow: hidden;
+    }
+    .ck.ck-toolbar {
+        border-radius: 0.75rem 0.75rem 0 0 !important;
+        border-color: var(--ck-color-toolbar-border) !important;
+    }
+    .ck.ck-editor__main > .ck-editor__editable {
+        border-radius: 0 0 0.75rem 0.75rem !important;
+        border-color: var(--ck-color-base-border) !important;
+        min-height: 180px;
+        resize: vertical;
+        overflow-y: auto;
+        color: var(--ck-color-base-text) !important;
+        background: var(--ck-color-base-background) !important;
+    }
+    .ck.ck-editor__main > .ck-editor__editable.ck-focused {
+        border-color: var(--ck-color-focus-border) !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.12) !important;
+    }
+    /* Texto do botão ativo */
+    .ck.ck-button { color: var(--ck-color-base-text) !important; }
+    /* Cabeçalhos e conteúdo dentro do editor */
+    .ck-editor__editable h2 { font-size: 1.25rem; font-weight: 700; margin: 0.5rem 0; }
+    .ck-editor__editable h3 { font-size: 1.1rem; font-weight: 600; margin: 0.4rem 0; }
+    .ck-editor__editable ul { list-style: disc; padding-left: 1.5rem; }
+    .ck-editor__editable ol { list-style: decimal; padding-left: 1.5rem; }
+    .ck-editor__editable blockquote {
+        border-left: 3px solid var(--ck-color-base-border);
+        padding-left: 0.75rem;
+        font-style: italic;
+        color: #94a3b8;
+    }
+    html.light-mode .ck-editor__editable blockquote { color: #64748b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6">{{ title }}</h2>
+
+        {% if user_role == 'admin' %}
+        <div class="mb-5">
+            <a href="{% url 'sistemas_list' %}" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition font-semibold">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+                </svg>
+                Gerenciar Sistemas cadastrados
+            </a>
+        </div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" novalidate class="space-y-5" id="chamado-form">
+            {% csrf_token %}
+            {% for field in form %}
+            {% if field.html_name == 'observadores' %}
+            <div>
+                <!-- Barra de toggle -->
+                <button type="button" id="obs-toggle"
+                        class="w-full flex items-center justify-between px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition text-left">
+                    <div class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400 shrink-0">
+                            <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+                            <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm font-semibold text-slate-700">Observadores</span>
+                        <span id="obs-count-badge"
+                              class="hidden px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400 hidden sm:block">opcional — receberão notificações por e-mail</span>
+                        <svg id="obs-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                             class="w-4 h-4 text-slate-400 transition-transform duration-200">
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                </button>
+
+                <!-- Painel recolhível -->
+                <div id="obs-panel" class="hidden mt-1 border border-slate-200 rounded-xl overflow-hidden">
+                    <div class="px-3 py-2.5 border-b border-slate-100">
+                        <input type="text" id="obs-search" placeholder="Filtrar por nome ou usuário…"
+                               autocomplete="off"
+                               class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm
+                                      focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+                    </div>
+                    <div id="obs-list" class="overflow-y-auto max-h-52 divide-y divide-slate-100">
+                        {% for checkbox in field %}
+                        <label class="obs-item flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition select-none"
+                               data-name="{{ checkbox.choice_label|lower }}">
+                            {{ checkbox.tag }}
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                                    {{ checkbox.choice_label|slice:":1"|upper }}
+                                </div>
+                                <span class="text-sm text-slate-700 truncate">{{ checkbox.choice_label }}</span>
+                            </div>
+                        </label>
+                        {% empty %}
+                        <p class="px-4 py-3 text-sm text-slate-400 italic">Nenhum usuário cadastrado.</p>
+                        {% endfor %}
+                    </div>
+                    <div class="px-4 py-2 border-t border-slate-100">
+                        <p id="obs-count" class="text-xs text-slate-400">Nenhum observador selecionado</p>
+                    </div>
+                </div>
+
+                {% if field.errors %}
+                <p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>
+                {% endif %}
+            </div>
+            {% else %}
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Seção de Anexos -->
+            <div class="pt-2">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">
+                    Anexos
+                    <span class="text-xs font-normal text-slate-400 ml-1">PDF, Word, Excel, imagens, ZIP… máx. 20 MB por arquivo</span>
+                </label>
+                <input type="file" name="anexos" multiple
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.png,.jpg,.jpeg,.gif,.webp"
+                       class="block w-full text-sm text-slate-500
+                              file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                              file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100 cursor-pointer transition">
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                <a href="{% url 'dashboard' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition">
+                    Salvar Chamado
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var textarea = document.querySelector('#id_descricao');
+    if (!textarea) return;
+
+    ClassicEditor.create(textarea, {
+        simpleUpload: {
+            uploadUrl: '/upload/imagem/',
+        },
+        toolbar: {
+            items: [
+                'heading', '|',
+                'bold', 'italic', 'underline', 'strikethrough', '|',
+                'link', '|',
+                'bulletedList', 'numberedList', '|',
+                'blockQuote', 'code', '|',
+                'imageUpload', '|',
+                'insertTable', '|',
+                'undo', 'redo'
+            ]
+        },
+        heading: {
+            options: [
+                { model: 'paragraph', title: 'Parágrafo', class: 'ck-heading_paragraph' },
+                { model: 'heading2', view: 'h2', title: 'Título 1', class: 'ck-heading_heading2' },
+                { model: 'heading3', view: 'h3', title: 'Título 2', class: 'ck-heading_heading3' },
+            ]
+        },
+        image: {
+            resizeUnit: '%',
+            resizeOptions: [
+                { name: 'resizeImage:original', value: null,  label: 'Original' },
+                { name: 'resizeImage:25',        value: '25',  label: '25%' },
+                { name: 'resizeImage:50',        value: '50',  label: '50%' },
+                { name: 'resizeImage:75',        value: '75',  label: '75%' },
+            ],
+            toolbar: [
+                'imageStyle:inline',
+                'imageStyle:block',
+                '|',
+                'resizeImage',
+                '|',
+                'imageTextAlternative'
+            ]
+        },
+        table: {
+            contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+        }
+    }).then(function (editor) {
+        var form = document.getElementById('chamado-form');
+        form.addEventListener('submit', function () {
+            textarea.value = editor.getData();
+        });
+    }).catch(function (err) {
+        console.error('CKEditor:', err);
+    });
+})();
+</script>
+
+<script>
+(function () {
+    var toggle   = document.getElementById('obs-toggle');
+    var panel    = document.getElementById('obs-panel');
+    var chevron  = document.getElementById('obs-chevron');
+    var search   = document.getElementById('obs-search');
+    var countEl  = document.getElementById('obs-count');
+    var badge    = document.getElementById('obs-count-badge');
+    var obsList  = document.getElementById('obs-list');
+    if (!obsList || !toggle) return;
+
+    // Abre / fecha o painel
+    function openPanel() {
+        panel.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    }
+    function closePanel() {
+        panel.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+    }
+    toggle.addEventListener('click', function () {
+        panel.classList.contains('hidden') ? openPanel() : closePanel();
+    });
+
+    // Atualiza contador e destaque
+    function updateCount() {
+        var checked = obsList.querySelectorAll('input[type="checkbox"]:checked');
+        var n = checked.length;
+
+        // texto dentro do painel
+        countEl.textContent = n === 0
+            ? 'Nenhum observador selecionado'
+            : n === 1 ? '1 observador selecionado'
+                      : n + ' observadores selecionados';
+
+        // badge na barra de toggle
+        if (n > 0) {
+            badge.textContent = n;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+
+        // destaque visual nos itens marcados
+        obsList.querySelectorAll('.obs-item').forEach(function (item) {
+            var cb = item.querySelector('input[type="checkbox"]');
+            if (cb && cb.checked) {
+                item.classList.add('bg-blue-50', 'border-l-2', 'border-blue-500');
+            } else {
+                item.classList.remove('bg-blue-50', 'border-l-2', 'border-blue-500');
+            }
+        });
+    }
+
+    obsList.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', updateCount);
+    });
+
+    // Filtro de busca
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = this.value.toLowerCase().trim();
+            obsList.querySelectorAll('.obs-item').forEach(function (item) {
+                item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
+    // Estado inicial — abre automaticamente se há observadores pré-selecionados (edição)
+    updateCount();
+    var preChecked = obsList.querySelectorAll('input[type="checkbox"]:checked').length;
+    if (preChecked > 0) openPanel();
+})();
+</script>
+{% endblock %}

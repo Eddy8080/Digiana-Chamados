@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+.eggs/
+
+# Ambiente virtual
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.production
+.env.staging
+
+# Arquivos estáticos coletados (collectstatic)
+staticfiles/
+static_root/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Cobertura de testes
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# Distribuição / Empacotamento
+*.manifest
+*.spec
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Windows
+desktop.ini
