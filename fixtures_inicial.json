@@ -61,8 +61,8 @@
   "model": "core.sistema",
   "pk": 1,
   "fields": {
-    "nome": "Digiana Inteligência Artificial",
-    "descricao": "Software de inteligência Artificial.",
+    "nome": "Digiana InteligÃªncia Artificial",
+    "descricao": "Software de inteligÃªncia Artificial.",
     "ativo": true,
     "criado_em": "2026-06-10T11:44:02.255Z"
   }
@@ -83,8 +83,8 @@
   "pk": 2,
   "fields": {
     "cliente": 2,
-    "nome": "Digiana Inteligência Artificial",
-    "descricao": "Projeto sendo construído para ser um auxiliar de contabilidade.",
+    "nome": "Digiana InteligÃªncia Artificial",
+    "descricao": "Projeto sendo construÃ­do para ser um auxiliar de contabilidade.",
     "criado_em": "2026-06-10T17:34:41.860Z"
   }
 },
@@ -94,7 +94,7 @@
   "fields": {
     "projeto": 2,
     "titulo": "Desenvolvimento de software",
-    "descricao": "<p>Busco informações do status de desenvolvimento.</p>",
+    "descricao": "<p>Busco informaÃ§Ãµes do status de desenvolvimento.</p>",
     "status": "pendente",
     "prioridade": "media",
     "sistema": null,
@@ -164,7 +164,7 @@
     "autor": [
       "Edilsonmn"
     ],
-    "conteudo": "<p>O status está em 50%</p>",
+    "conteudo": "<p>O status estÃ¡ em 50%</p>",
     "criado_em": "2026-06-10T17:40:16.487Z",
     "resposta_pai": null
   }
@@ -176,7 +176,7 @@
     "chamado": 3,
     "resposta": null,
     "arquivo": "chamados/3/anexos/Digiana__Manual_de_Arquitetura.pdf",
-    "nome_original": "Digiana — Manual de Arquitetura.pdf",
+    "nome_original": "Digiana Â— Manual de Arquitetura.pdf",
     "tipo_mime": "application/pdf",
     "criado_em": "2026-06-10T17:38:49.406Z",
     "criado_por": [
