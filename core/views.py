@@ -399,10 +399,11 @@ def disparar_email(assunto, mensagem, destinatarios):
             fail_silently=False,
             timeout=15,
         )
+        from_email = config.remetente or config.usuario
         email = EmailMessage(
             subject=assunto,
             body=mensagem,
-            from_email=config.usuario,
+            from_email=from_email,
             to=destinatarios,
             connection=connection,
         )
@@ -1295,6 +1296,7 @@ def testar_email_view(request):
         'servidor': config.servidor_smtp,
         'porta': config.porta,
         'usuario': config.usuario,
+        'remetente': config.remetente or config.usuario,
         'ssl': config.use_ssl,
         'tls': config.use_tls,
         'senha_configurada': bool(config.senha),
@@ -1380,6 +1382,26 @@ def configurar_email_ativar(request, pk):
     config.ativo = True
     config.save()
     messages.success(request, f"'{config.nome}' ativada como configuração SMTP principal.")
+    return redirect('configurar_email')
+
+
+@login_required(login_url='login')
+def configurar_email_toggle(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method != 'POST':
+        return redirect('configurar_email')
+    config = get_object_or_404(ConfigurarEmail, pk=pk)
+    if config.ativo:
+        config.ativo = False
+        config.save()
+        messages.info(request, f"'{config.nome}' desativada. Nenhum servidor SMTP ativo no momento.")
+    else:
+        ConfigurarEmail.objects.all().update(ativo=False)
+        config.ativo = True
+        config.save()
+        messages.success(request, f"'{config.nome}' ativada como configuração SMTP principal.")
     return redirect('configurar_email')
 
 

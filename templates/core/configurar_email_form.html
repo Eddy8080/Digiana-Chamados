@@ -95,7 +95,17 @@
                     {% if form.usuario.errors %}
                     <p class="mt-1 text-xs text-rose-500">{{ form.usuario.errors|join:', ' }}</p>
                     {% endif %}
-                    <p class="mt-1.5 text-xs text-slate-400">E-mail que aparecerá como remetente nas notificações.</p>
+                    <p class="mt-1.5 text-xs text-slate-400">Login usado para autenticar no servidor SMTP. Ex: <code>ae6030001@smtp-brevo.com</code></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        {{ form.remetente.label }}
+                    </label>
+                    {{ form.remetente }}
+                    {% if form.remetente.errors %}
+                    <p class="mt-1 text-xs text-rose-500">{{ form.remetente.errors|join:', ' }}</p>
+                    {% endif %}
+                    <p class="mt-1.5 text-xs text-slate-400">Aparece no "De:" das notificações. Se vazio, usa o Usuário acima. Ex: <code>edilson.monteiro@anagma.com.br</code></p>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">{{ form.senha.label }}</label>

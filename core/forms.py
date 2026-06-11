@@ -307,12 +307,13 @@ class ConfigurarEmailForm(forms.ModelForm):
 
     class Meta:
         model = ConfigurarEmail
-        fields = ['nome', 'servidor_smtp', 'porta', 'usuario', 'senha', 'use_ssl', 'use_tls']
+        fields = ['nome', 'servidor_smtp', 'porta', 'usuario', 'remetente', 'senha', 'use_ssl', 'use_tls']
         labels = {
             'nome': 'Nome da configuração',
             'servidor_smtp': 'Servidor SMTP',
             'porta': 'Porta',
-            'usuario': 'Usuário / E-mail remetente',
+            'usuario': 'Usuário / Login SMTP',
+            'remetente': 'E-mail remetente',
             'use_ssl': 'Usar SSL — porta 465',
             'use_tls': 'Usar TLS/STARTTLS — porta 587',
         }
@@ -320,7 +321,8 @@ class ConfigurarEmailForm(forms.ModelForm):
             'nome': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Ex: Zoho Mail, Brevo Produção…'}),
             'servidor_smtp': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'smtp.zoho.com'}),
             'porta': forms.NumberInput(attrs={'class': _INPUT, 'placeholder': '465'}),
-            'usuario': forms.EmailInput(attrs={'class': _INPUT, 'placeholder': 'seu@email.com'}),
+            'usuario': forms.EmailInput(attrs={'class': _INPUT, 'placeholder': 'ae6030001@smtp-brevo.com'}),
+            'remetente': forms.EmailInput(attrs={'class': _INPUT, 'placeholder': 'Ex: notificacoes@anagma.com.br (opcional)'}),
             'use_ssl': forms.CheckboxInput(attrs={'class': 'w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500'}),
             'use_tls': forms.CheckboxInput(attrs={'class': 'w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500'}),
         }

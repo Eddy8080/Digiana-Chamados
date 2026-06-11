@@ -47,6 +47,7 @@ urlpatterns = [
     path('configuracao-email/testar/', views.testar_email_view, name='testar_email'),
     path('configuracao-email/<int:pk>/editar/', views.configurar_email_update, name='configurar_email_update'),
     path('configuracao-email/<int:pk>/ativar/', views.configurar_email_ativar, name='configurar_email_ativar'),
+    path('configuracao-email/<int:pk>/toggle/', views.configurar_email_toggle, name='configurar_email_toggle'),
     path('configuracao-email/<int:pk>/excluir/', views.configurar_email_delete, name='configurar_email_delete'),
 
     # Foto de perfil (qualquer usuário autenticado)
