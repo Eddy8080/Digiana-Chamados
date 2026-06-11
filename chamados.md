@@ -2134,7 +2134,264 @@ JavaScript (injetado antes de `{% block extra_js %}`):
 
 ---
 
+### Implementação 36 — Backend SMTP Compatível com Python 3.12
+
+**Arquivo criado:** `core/email_backend.py`
+
+**Problema:** O Django 3.2 passa os parâmetros `keyfile` e `certfile` para `smtplib.SMTP_SSL` mesmo quando são `None`. O Python 3.12 removeu esses parâmetros e lança `TypeError` ao recebê-los.
+
+**Solução:** Subclasse `Py312SMTPEmailBackend` que sobrescreve `open()` e só repassa `keyfile`/`certfile` quando não são `None`:
+
+```python
+class Py312SMTPEmailBackend(EmailBackend):
+    def open(self):
+        if self.connection:
+            return False
+        params = {'local_hostname': DNS_NAME.get_fqdn()}
+        if self.timeout is not None:
+            params['timeout'] = self.timeout
+        if self.use_ssl:
+            if self.ssl_keyfile:
+                params['keyfile'] = self.ssl_keyfile
+            if self.ssl_certfile:
+                params['certfile'] = self.ssl_certfile
+        try:
+            klass = smtplib.SMTP_SSL if self.use_ssl else smtplib.SMTP
+            self.connection = klass(self.host, self.port, **params)
+            if not self.use_ssl and self.use_tls:
+                self.connection.ehlo()
+                starttls_params = {}
+                if self.ssl_keyfile:
+                    starttls_params['keyfile'] = self.ssl_keyfile
+                if self.ssl_certfile:
+                    starttls_params['certfile'] = self.ssl_certfile
+                self.connection.starttls(**starttls_params)
+                self.connection.ehlo()
+            if self.username and self.password:
+                self.connection.login(self.username, self.password)
+            return True
+        except OSError:
+            if not self.fail_silently:
+                raise
+```
+
+`disparar_email` foi atualizado para usar `backend='core.email_backend.Py312SMTPEmailBackend'` em vez do backend padrão do Django.
+
+**`disparar_email` — novo retorno:** A função passou a retornar uma **tupla `(bool, str)`** em vez de apenas `bool`. O segundo elemento é a mensagem de erro (string vazia em caso de sucesso), permitindo que as views exibam o motivo exato da falha ao usuário via `messages.warning`.
+
+```python
+def disparar_email(assunto, mensagem, destinatarios):
+    # ...
+    try:
+        # ... envio ...
+        return True, ''
+    except Exception as e:
+        erro = str(e) or f'{type(e).__name__} (sem mensagem)'
+        logger.error("Falha ao enviar e-mail para %s — %s", destinatarios, erro)
+        return False, erro
+```
+
+Todas as chamadas a `disparar_email` foram atualizadas de `ok = disparar_email(...)` para `ok, erro = disparar_email(...)`.
+
+---
+
+### Implementação 37 — Campos de Contato e Migração de Anexos e Contatos
+
+**Migrações novas (anteriormente marcadas como "intermediária"):**
+
+| Migração | Conteúdo real |
+|---|---|
+| `0010_anexo.py` | `CreateModel Anexo` — cria tabela `core_anexo` com FK para `Chamado`, `User` e campos `arquivo`, `nome_original`, `tipo_mime`, `criado_em` |
+| `0011_perfilusuario_contatos.py` | `AddField` de `celular`, `whatsapp` e `telefone_fixo` (CharField, max 20, nullable) ao `PerfilUsuario` |
+
+**Campos adicionados ao modelo `PerfilUsuario`:**
+
+```python
+celular       = models.CharField(max_length=20, blank=True, null=True)
+whatsapp      = models.CharField(max_length=20, blank=True, null=True)
+telefone_fixo = models.CharField(max_length=20, blank=True, null=True)
+```
+
+**Forms atualizados:**
+
+`UserRegisterForm` e `UsuarioEditForm` incluem os três campos com `_FONE_ATTRS` / `_FIXO_ATTRS` (placeholders de formatação telefônica), em `field_order` e no `save()` de ambos os forms. Valores em branco são convertidos para `None` no banco.
+
+---
+
+### Implementação 38 — Reset de Senha pelo Admin
+
+**Motivação:** O admin precisava redefinir a senha de um usuário sem precisar compartilhar a senha atual. O fluxo de reset gera uma nova senha temporária, envia por e-mail e força a troca no próximo login.
+
+**View `usuario_reset_senha` em `core/views.py`:**
+
+```python
+@login_required(login_url='login')
+def usuario_reset_senha(request, pk):
+    # Somente admin
+    # Não pode resetar própria conta nem superusuário
+    _alphabet = string.ascii_letters + string.digits + '!@#$'
+    temp_password = ''.join(secrets.choice(_alphabet) for _ in range(12))
+    usuario.set_password(temp_password)
+    usuario.save()
+    perfil.must_change_password = True
+    perfil.save()
+    ok_email, erro_email = disparar_email(
+        f"[Digiana] Sua senha foi redefinida — {nome_completo}",
+        f"Login: {usuario.username}\nSenha temporária: {temp_password}\n...",
+        [usuario.email],
+    )
+    # Se falhar → marca email_verificar=True + messages.warning com motivo
+    return redirect('usuarios_list')
+```
+
+**Proteções:**
+- Não pode resetar a própria conta
+- Não pode resetar superusuário
+- Se o usuário não tiver e-mail: `(False, "Usuário sem e-mail cadastrado.")`
+- Se SMTP falhar: marca `email_verificar=True` e exibe aviso com erro
+
+**URL adicionada:**
+```python
+path('usuarios/<int:pk>/resetar-senha/', views.usuario_reset_senha, name='usuario_reset_senha'),
+```
+
+---
+
+### Implementação 39 — Teste de Configuração SMTP
+
+**Motivação:** Ao trocar de servidor SMTP (ex.: de Zoho Mail para Brevo), o admin precisava validar a configuração antes de depender dela para notificações reais.
+
+**View `testar_email_view` em `core/views.py`:**
+
+```python
+@login_required(login_url='login')
+def testar_email_view(request):
+    # Somente admin, somente POST
+    # Destinatário: campo 'destinatario' do POST ou request.user.email
+    diagnostico = {
+        'servidor': config.servidor_smtp,
+        'porta': config.porta,
+        'usuario': config.usuario,
+        'ssl': config.use_ssl,
+        'tls': config.use_tls,
+        'senha_configurada': bool(config.senha),
+    }
+    ok, erro = disparar_email('[Digiana] Teste de Configuração SMTP', '...', [destinatario])
+    if ok:
+        return JsonResponse({'ok': True, 'destinatario': destinatario, 'diagnostico': diagnostico})
+    return JsonResponse({'ok': False, 'erro': erro, 'diagnostico': diagnostico})
+```
+
+Retorna JSON com o diagnóstico completo (servidor, porta, ssl/tls, senha configurada) independentemente do resultado, permitindo ao admin identificar exatamente qual parâmetro está errado. O `template configurar_email.html` chama este endpoint via `fetch` e exibe o resultado inline na página.
+
+**URL adicionada:**
+```python
+path('configuracao-email/testar/', views.testar_email_view, name='testar_email'),
+```
+
+---
+
+### Implementação 40 — Barra de Tempo em Horas Úteis
+
+**Motivação:** A barra de tempo calculava horas de calendário (wall-clock), o que distorcia chamados abertos no fim de semana ou à noite. O tempo relevante para SLA é o tempo em que a equipe estava disponível para atender.
+
+**Novos helpers em `core/views.py`:**
+
+```python
+_HORA_INICIO_UTIL = 8   # 08:00
+_HORA_FIM_UTIL    = 18  # 18:00
+
+def _horas_uteis(dt_inicio, dt_fim):
+    """Soma apenas os segundos que caem em seg–sex, 08h–18h (horário local)."""
+    # ... itera dia a dia, acumula interseção com janela útil ...
+    return total / 3600
+
+def _horas_extra(dt_inicio, dt_fim):
+    """Soma o tempo total decorrido em sábados e domingos no intervalo."""
+    # ... itera dia a dia, acumula dias de fim de semana ...
+    return total / 3600
+```
+
+**Escala de cores atualizada (em horas úteis):**
+
+| Horas úteis decorridas | Cor | Tailwind |
+|---|---|---|
+| < 10 h (~ 1 dia útil) | Verde | `bg-emerald-500` |
+| 10 h – 30 h (~1–3 dias úteis) | Azul | `bg-blue-500` |
+| 30 h – 70 h (~3–7 dias úteis) | Âmbar | `bg-amber-500` |
+| > 70 h (> 7 dias úteis) | Vermelho | `bg-rose-500` |
+
+A referência de 100% da barra continua em 240 h (mas agora são 240 h úteis, equivalente a ~30 dias úteis).
+
+**Contexto adicional em `chamado_detail`:**
+
+| Variável nova | Conteúdo |
+|---|---|
+| `horas_extra` | Float — horas de fim de semana no período |
+| `tempo_extra` | String legível — ex.: "1 dia e 3h" (fins de semana) |
+
+O template exibe `tempo_extra` como informação secundária ("+ X em fins de semana") abaixo da barra de tempo.
+
+**Formato de texto da barra:**
+
+| Situação | Exibição |
+|---|---|
+| < 60 min | `"45 min"` |
+| < 10 h | `"3h 20min"` |
+| < 10 dias úteis | `"2h"` (horas com resto) |
+| ≥ 1 dia útil | `"1 dia útil"` / `"2 dias úteis e 3h"` |
+
+---
+
+### Implementação 41 — Helper `_build_link` e Correção de `_build_destinatarios`
+
+**`_build_link(request, path)` — novo helper em `core/views.py`:**
+
+```python
+def _build_link(request, path):
+    """Retorna URL absoluta usando SITE_URL do settings quando configurado."""
+    from django.conf import settings as _s
+    base = getattr(_s, 'SITE_URL', '').rstrip('/')
+    if base:
+        return base + path
+    return request.build_absolute_uri(path)
+```
+
+**Motivação:** `request.build_absolute_uri()` em produção no Railway gerava URLs com `http://` ou com o host interno do container em vez da URL pública. `SITE_URL` é definida em `settings.py` como `https://<RAILWAY_PUBLIC_DOMAIN>` quando em produção, garantindo que todos os links nos e-mails apontem para a URL correta. Em desenvolvimento, cai no fallback `build_absolute_uri`.
+
+**`_build_destinatarios` — remoção do e-mail do cliente cadastrado:**
+
+A função foi alterada para incluir **apenas usuários com login no sistema** (criador + responsável + observadores). O e-mail do `chamado.projeto.cliente` (entidade jurídica) foi removido dos destinatários.
+
+```python
+# Antes: incluía chamado.projeto.cliente.email
+# Depois: apenas criador, responsável e observadores
+
+def _build_destinatarios(chamado, extras=None):
+    candidatos = []
+    if chamado.criado_por and chamado.criado_por.email:
+        candidatos.append(chamado.criado_por.email)
+    if chamado.responsavel and chamado.responsavel.email:
+        candidatos.append(chamado.responsavel.email)
+    for obs in chamado.observadores.all():
+        if obs.email:
+            candidatos.append(obs.email)
+    # ... deduplicação ...
+```
+
+**Motivo:** O e-mail do `Cliente` é o e-mail da empresa/pessoa jurídica do cadastro, que pode não ser a caixa correta para receber notificações de chamados. Usuários externos da empresa cliente já têm contas no sistema com `perfil.cliente` vinculado — eles são incluídos como `observadores` quando necessário, garantindo notificação sem envio para caixas genéricas de empresa.
+
+---
+
 ## Estado Atual dos Arquivos
+
+### `core/email_backend.py`
+
+Arquivo: `core/email_backend.py` — backend SMTP customizado.
+
+Classe `Py312SMTPEmailBackend(EmailBackend)` — corrige incompatibilidade do Django 3.2 com Python 3.12: evita passar `keyfile`/`certfile=None` para `smtplib.SMTP_SSL`, que rejeitava esses parâmetros a partir do Python 3.12. Registrado em `disparar_email` via `backend='core.email_backend.Py312SMTPEmailBackend'`.
+
+---
 
 ### `core/models.py`
 
@@ -2161,12 +2418,13 @@ Oito modelos:
 | `_horas_uteis(dt_inicio, dt_fim)` | Soma horas seg–sex 08h–18h no intervalo (usado em `chamado_detail`) |
 | `_horas_extra(dt_inicio, dt_fim)` | Soma horas de sábado e domingo no intervalo |
 | `_strip_html(texto)` | Remove tags HTML (CKEditor) + decodifica entidades para texto plano |
-| `_build_destinatarios(chamado, extras)` | Monta lista deduplicada de e-mails (criador + responsável + cliente + **observadores**) |
+| `_build_destinatarios(chamado, extras)` | Monta lista deduplicada de e-mails: criador + responsável + observadores — **não inclui e-mail do `Cliente` cadastrado** |
+| `_build_link(request, path)` | Retorna URL absoluta usando `SITE_URL` do settings (produção) ou `request.build_absolute_uri` (dev) |
 | `_aplicar_restricoes_usuario(form, user, chamado=None)` | Remove `status`/`responsavel` para gestor/usuario; remove opção `fechado` das choices para não-admin/não-responsável |
 | `_status_permitido(status_novo, user, chamado=None)` | Guard server-side: impede `pendente` para não-admin/dev; impede `fechado` para não-admin/não-responsável |
 | `_salvar_anexos(request, chamado)` | Persiste arquivos do `request.FILES['anexos']` como objetos `Anexo` de chamado (máx 20 MB, `resposta=None`) |
 | `_salvar_anexos_resposta(request, chamado, resposta)` | Persiste arquivos do `request.FILES['anexos']` como objetos `Anexo` vinculados a uma `Resposta` específica (máx 20 MB) |
-| `disparar_email(assunto, mensagem, destinatarios)` | Envia e-mail via `ConfigurarEmail` singleton; retorna `True/False` |
+| `disparar_email(assunto, mensagem, destinatarios)` | Envia e-mail via `ConfigurarEmail` singleton via `Py312SMTPEmailBackend`; retorna **tupla `(bool, str)`** — `(True, '')` ou `(False, mensagem_erro)` |
 
 **Views com URL:**
 
@@ -2199,7 +2457,9 @@ Oito modelos:
 | `usuarios_list` | GET | Somente admin (paginado 20/pág) |
 | `usuario_edit` | GET/POST | Somente admin |
 | `usuario_delete` | POST | Somente admin |
+| `usuario_reset_senha` | POST | Somente admin — gera senha temporária, envia e-mail, força `must_change_password=True` |
 | `configurar_email_view` | GET/POST | Somente admin |
+| `testar_email_view` | POST | Somente admin — envia e-mail de teste; retorna JSON `{ok, erro, diagnostico}` |
 | `perfil_foto_view` | POST | Autenticado — salva foto em `media/avatares/`; retorna JSON `{ok, url}` |
 | `upload_imagem_view` | POST | Autenticado — `@csrf_exempt`, salva imagem em `media/ckeditor/YYYY/MM/` |
 
@@ -2264,6 +2524,7 @@ Oito modelos:
 
 # Configuração
 /configuracao-email/             → configurar_email_view (admin only)
+/configuracao-email/testar/      → testar_email_view     (POST, JSON, admin only)
 
 # Foto de perfil (qualquer usuário autenticado)
 /perfil/foto/                    → perfil_foto_view      (POST, JSON, @login_required)
@@ -2312,8 +2573,8 @@ TIME_ZONE = 'America/Sao_Paulo'
 | `0007_perfilusuario_must_change_password.py` | Adiciona campo `must_change_password` |
 | `0008_auto_20260608_1806.py` | Cria `Sistema`, adiciona FK `sistema` ao `Chamado` |
 | `0009_alter_chamado_status.py` | Adiciona status `pendente` ao `Chamado` |
-| `0010_...` | (intermediária — contexto anterior) |
-| `0011_...` | (intermediária — contexto anterior) |
+| `0010_anexo.py` | `CreateModel Anexo` — cria tabela `core_anexo` com FK para `Chamado`, `User`; campos `arquivo`, `nome_original`, `tipo_mime`, `criado_em`, `criado_por` |
+| `0011_perfilusuario_contatos.py` | `AddField` de `celular`, `whatsapp` e `telefone_fixo` (CharField max 20, nullable) ao `PerfilUsuario` |
 | `0012_cliente_cpf_cnpj.py` | Adiciona campo `cpf_cnpj` ao `Cliente` |
 | `0013_perfilusuario_cliente.py` | Adiciona FK `cliente` ao `PerfilUsuario` |
 | `0014_chamado_observadores.py` | Adiciona M2M `observadores` ao `Chamado` — tabela `core_chamado_observadores` |
