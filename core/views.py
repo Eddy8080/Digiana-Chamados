@@ -1413,9 +1413,6 @@ def configurar_email_delete(request, pk):
     if request.method != 'POST':
         return redirect('configurar_email')
     config = get_object_or_404(ConfigurarEmail, pk=pk)
-    if config.ativo:
-        messages.error(request, "Não é possível excluir a configuração ativa. Ative outra primeiro.")
-        return redirect('configurar_email')
     nome = config.nome
     config.delete()
     messages.success(request, f"Configuração '{nome}' excluída.")
