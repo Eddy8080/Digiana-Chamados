@@ -127,6 +127,7 @@ class ConfigurarEmail(models.Model):
     senha = models.CharField(max_length=200, blank=True, null=True, help_text="Senha ou senha de aplicativo")
     use_tls = models.BooleanField(default=False, help_text="STARTTLS — porta 587")
     use_ssl = models.BooleanField(default=True, help_text="SSL direto — porta 465 (recomendado Zoho)")
+    usar_api = models.BooleanField(default=False, verbose_name='Usar API HTTP', help_text='Envia via API HTTP (ignora SMTP). Use quando a porta SMTP estiver bloqueada pelo provedor.')
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -381,12 +381,43 @@ def projeto_delete(request, pk):
 
 
 def disparar_email(assunto, mensagem, destinatarios):
-    """Envia e-mail via SMTP configurado. Retorna (True, '') ou (False, mensagem_erro)."""
+    """Envia e-mail via API HTTP ou SMTP. Retorna (True, '') ou (False, mensagem_erro)."""
+    import requests as _req
     config = ConfigurarEmail.objects.filter(ativo=True).first()
     if not config:
-        return False, "Nenhuma configuração SMTP ativa. Acesse Configuração de E-mail e ative uma."
+        return False, "Nenhuma configuração de e-mail ativa. Acesse Configuração de E-mail e ative uma."
     if not config.senha:
-        return False, "Senha SMTP não configurada na configuração ativa. Acesse Configuração de E-mail."
+        return False, "Senha / chave de API não configurada. Acesse Configuração de E-mail."
+
+    if config.usar_api:
+        try:
+            remetente = config.remetente or config.usuario
+            payload = {
+                'sender': {'email': remetente, 'name': 'Digiana'},
+                'to': [{'email': e} for e in destinatarios],
+                'subject': assunto,
+                'textContent': mensagem,
+            }
+            resp = _req.post(
+                'https://api.brevo.com/v3/smtp/email',
+                json=payload,
+                headers={
+                    'accept': 'application/json',
+                    'api-key': config.senha,
+                    'content-type': 'application/json',
+                },
+                timeout=15,
+            )
+            if resp.status_code == 201:
+                return True, ''
+            erro = f"API Brevo: HTTP {resp.status_code} — {resp.text[:300]}"
+            logger.error("Falha API Brevo para %s — %s", destinatarios, erro)
+            return False, erro
+        except Exception as e:
+            erro = str(e) or f'{type(e).__name__} (sem mensagem)'
+            logger.error("Falha API Brevo para %s — %s", destinatarios, erro)
+            return False, erro
+
     try:
         connection = get_connection(
             backend='core.email_backend.Py312SMTPEmailBackend',
@@ -411,7 +442,7 @@ def disparar_email(assunto, mensagem, destinatarios):
         return True, ''
     except Exception as e:
         erro = str(e) or f'{type(e).__name__} (sem mensagem)'
-        logger.error("Falha ao enviar e-mail para %s — %s", destinatarios, erro)
+        logger.error("Falha SMTP para %s — %s", destinatarios, erro)
         return False, erro
 
 
@@ -1293,6 +1324,7 @@ def testar_email_view(request):
         return JsonResponse({'ok': False, 'erro': 'Nenhuma configuração SMTP ativa. Ative uma na lista de configurações.'})
 
     diagnostico = {
+        'modo': 'API HTTP (Brevo)' if config.usar_api else 'SMTP',
         'servidor': config.servidor_smtp,
         'porta': config.porta,
         'usuario': config.usuario,

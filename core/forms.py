@@ -307,9 +307,10 @@ class ConfigurarEmailForm(forms.ModelForm):
 
     class Meta:
         model = ConfigurarEmail
-        fields = ['nome', 'servidor_smtp', 'porta', 'usuario', 'remetente', 'senha', 'use_ssl', 'use_tls']
+        fields = ['nome', 'usar_api', 'servidor_smtp', 'porta', 'usuario', 'remetente', 'senha', 'use_ssl', 'use_tls']
         labels = {
             'nome': 'Nome da configuração',
+            'usar_api': 'Usar API HTTP (Brevo)',
             'servidor_smtp': 'Servidor SMTP',
             'porta': 'Porta',
             'usuario': 'Usuário / Login SMTP',
@@ -319,6 +320,7 @@ class ConfigurarEmailForm(forms.ModelForm):
         }
         widgets = {
             'nome': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Ex: Zoho Mail, Brevo Produção…'}),
+            'usar_api': forms.CheckboxInput(attrs={'class': 'w-5 h-5 rounded border-slate-300 text-purple-600 focus:ring-purple-500'}),
             'servidor_smtp': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'smtp.zoho.com'}),
             'porta': forms.NumberInput(attrs={'class': _INPUT, 'placeholder': '465'}),
             'usuario': forms.EmailInput(attrs={'class': _INPUT, 'placeholder': 'ae6030001@smtp-brevo.com'}),
