@@ -391,7 +391,8 @@ def disparar_email(assunto, mensagem, destinatarios):
 
     if config.usar_api:
         try:
-            remetente = config.remetente or config.usuario
+            api_key = (config.senha or '').strip()
+            remetente = (config.remetente or config.usuario or '').strip()
             payload = {
                 'sender': {'email': remetente, 'name': 'Digiana'},
                 'to': [{'email': e} for e in destinatarios],
@@ -403,7 +404,7 @@ def disparar_email(assunto, mensagem, destinatarios):
                 json=payload,
                 headers={
                     'accept': 'application/json',
-                    'api-key': config.senha,
+                    'api-key': api_key,
                     'content-type': 'application/json',
                 },
                 timeout=15,
@@ -1323,6 +1324,7 @@ def testar_email_view(request):
     if not config:
         return JsonResponse({'ok': False, 'erro': 'Nenhuma configuração SMTP ativa. Ative uma na lista de configurações.'})
 
+    _senha = (config.senha or '').strip()
     diagnostico = {
         'modo': 'API HTTP (Brevo)' if config.usar_api else 'SMTP',
         'servidor': config.servidor_smtp,
@@ -1331,7 +1333,8 @@ def testar_email_view(request):
         'remetente': config.remetente or config.usuario,
         'ssl': config.use_ssl,
         'tls': config.use_tls,
-        'senha_configurada': bool(config.senha),
+        'senha_configurada': bool(_senha),
+        'chave_prefixo': (_senha[:12] + '...') if len(_senha) > 12 else ('(vazia)' if not _senha else _senha),
     }
 
     ok, erro = disparar_email(

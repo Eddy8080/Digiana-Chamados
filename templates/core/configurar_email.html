@@ -203,11 +203,13 @@
                 var d = data.diagnostico;
                 diagDiv.innerHTML =
                     '<div class="font-semibold text-slate-500 mb-1">Configuração ativa usada:</div>' +
+                    '<div>Modo: <strong>' + escapeHtml(d.modo) + '</strong></div>' +
                     '<div>Servidor: ' + escapeHtml(d.servidor) + ':' + d.porta + '</div>' +
                     '<div>Usuário (login SMTP): ' + escapeHtml(d.usuario) + '</div>' +
                     '<div>Remetente (De:): ' + escapeHtml(d.remetente) + '</div>' +
                     '<div>SSL: ' + (d.ssl ? 'Sim' : 'Não') + '  |  TLS: ' + (d.tls ? 'Sim' : 'Não') + '</div>' +
-                    '<div>Senha configurada: ' + (d.senha_configurada ? 'Sim' : '<strong class="text-rose-600">Não</strong>') + '</div>';
+                    '<div>Senha/Chave configurada: ' + (d.senha_configurada ? 'Sim' : '<strong class="text-rose-600">Não</strong>') + '</div>' +
+                    '<div>Prefixo da chave: <strong>' + escapeHtml(d.chave_prefixo) + '</strong></div>';
             }
         })
         .catch(function (err) {
