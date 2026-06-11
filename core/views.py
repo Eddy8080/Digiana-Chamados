@@ -160,6 +160,7 @@ def cadastro_view(request):
             user.save()
 
             nome_completo = user.get_full_name() or user.username
+            link_sistema = _build_link(request, '/')
             ok_email, erro_email = disparar_email(
                 f"[Digiana] Bem-vindo, {nome_completo}! Seu acesso foi criado.",
                 (
@@ -167,7 +168,8 @@ def cadastro_view(request):
                     f"Seu acesso ao sistema Digiana foi criado.\n\n"
                     f"Login:            {user.username}\n"
                     f"Senha temporária: {temp_password}\n\n"
-                    f"Acesse o sistema e altere sua senha no primeiro login.\n\n"
+                    f"Acesse o sistema pelo link abaixo e altere sua senha no primeiro login:\n"
+                    f"{link_sistema}\n\n"
                     f"Esta é uma mensagem automática — não responda a este e-mail."
                 ),
                 [user.email],
@@ -512,6 +514,7 @@ def chamado_create(request):
                     chamado.responsavel.get_full_name() or chamado.responsavel.username
                     if chamado.responsavel else 'Não atribuído'
                 )
+                link = _build_link(request, f'/chamados/{chamado.id}/')
                 assunto = f"[Digiana] Chamado #{chamado.id} Registrado: {chamado.titulo}"
                 mensagem = (
                     f"Olá,\n\n"
@@ -523,11 +526,13 @@ def chamado_create(request):
                     f"Aberto por:  {chamado.criado_por.get_full_name() or chamado.criado_por.username}\n"
                     f"Responsável: {responsavel_nome}\n\n"
                     f"Descrição:\n{_strip_html(chamado.descricao)}\n\n"
-                    f"Acesse o chamado: {_build_link(request, f'/chamados/{chamado.id}/')}"
+                    f"Acesse o chamado: {link}"
                 )
                 ok_notif, erro_notif = disparar_email(assunto, mensagem, destinatarios)
                 if not ok_notif:
                     messages.warning(request, f"Chamado salvo. E-mail de notificação não enviado — {erro_notif}")
+            else:
+                messages.info(request, "Chamado salvo. Nenhum destinatário encontrado — criador e responsável não têm e-mail cadastrado.")
 
             messages.success(request, "Chamado aberto com sucesso!")
             return redirect('dashboard')
@@ -632,6 +637,8 @@ def chamado_detail(request, pk):
                 ok_notif, erro_notif = disparar_email(assunto, mensagem, destinatarios)
                 if not ok_notif:
                     messages.warning(request, f"Chamado salvo. E-mail de notificação não enviado — {erro_notif}")
+            elif not email_atribuicao_enviado:
+                messages.info(request, "Chamado salvo. Nenhum destinatário encontrado — criador e responsável não têm e-mail cadastrado.")
 
             messages.success(request, "Chamado atualizado com sucesso!")
             return redirect('chamado_detail', pk=chamado.pk)
@@ -832,6 +839,8 @@ def chamado_update(request, pk):
                 ok_notif, erro_notif = disparar_email(assunto, mensagem, destinatarios)
                 if not ok_notif:
                     messages.warning(request, f"Chamado salvo. E-mail de notificação não enviado — {erro_notif}")
+            elif not email_atribuicao_enviado:
+                messages.info(request, "Chamado salvo. Nenhum destinatário encontrado — criador e responsável não têm e-mail cadastrado.")
 
             messages.success(request, "Chamado atualizado com sucesso!")
             return redirect('chamado_detail', pk=chamado.pk)

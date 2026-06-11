@@ -2925,3 +2925,227 @@ O **Zoho ZeptoMail** é o produto da própria Zoho criado especificamente para e
 5. Atualizar `fixtures_inicial.json` com a nova configuração
 
 **Alternativa:** Brevo (antigo Sendinblue) — 300 e-mails/dia grátis, SMTP `smtp-relay.brevo.com:587`, funciona em cloud sem restrição.
+
+---
+
+## Implementação 29 — Multi-SMTP com Toggle de Ativação (Zoho + Brevo)
+
+### O que foi construído
+
+- Múltiplas configurações SMTP cadastradas no banco com campo `ativo` para exclusividade
+- Toggle iOS-style na coluna Status da tabela de configurações (ativa/desativa com clique)
+- Campo `nome` para identificar cada configuração (ex: "Zoho Mail", "Brevo Produção")
+- Campo `remetente` separado do `usuario` — o "De:" pode ser diferente do login SMTP
+- Botões Editar e Excluir sempre visíveis para qualquer configuração (ativa ou não)
+
+### Migrações
+
+| Migration | Campo adicionado |
+|---|---|
+| `0019_configuraremail_remetente` | `remetente` (e-mail que aparece no "De:") |
+| `0020_alter_configuraremail_senha` | Amplia `max_length` do campo `senha` |
+| `0021_configuraremail_usar_api` | `usar_api` (modo API HTTP Brevo) |
+
+### View de toggle (exclusividade)
+
+```python
+@login_required(login_url='login')
+def configurar_email_toggle(request, pk):
+    if _role(request.user) != 'admin':
+        return redirect('dashboard')
+    config = get_object_or_404(ConfigurarEmail, pk=pk)
+    if config.ativo:
+        config.ativo = False
+        config.save()
+    else:
+        ConfigurarEmail.objects.all().update(ativo=False)
+        config.ativo = True
+        config.save()
+    return redirect('configurar_email')
+```
+
+### URL adicionada
+
+```python
+path('configuracao-email/<int:pk>/toggle/', views.configurar_email_toggle, name='configurar_email_toggle'),
+```
+
+---
+
+## Implementação 30 — Envio de E-mail via API HTTP do Brevo
+
+### Contexto e problema
+
+Após migrar de Zoho SMTP para Brevo, o envio via SMTP (portas 465 e 587) também dava **timeout** no Railway — a porta SMTP de saída estava bloqueada pelo provedor de hospedagem. A solução definitiva foi abandonar SMTP e usar a **API HTTP do Brevo** na porta 443 (HTTPS), que nunca é bloqueada.
+
+**Log de erro SMTP (timeout):**
+```
+[CRITICAL] WORKER TIMEOUT (pid:37)
+```
+
+### Campo `usar_api` no modelo
+
+```python
+# core/models.py
+usar_api = models.BooleanField(
+    default=False,
+    verbose_name='Usar API HTTP',
+    help_text='Envia via API HTTP (ignora SMTP). Use quando a porta SMTP estiver bloqueada pelo provedor.'
+)
+```
+
+### Função `disparar_email` com modo API
+
+```python
+def disparar_email(assunto, mensagem, destinatarios):
+    import requests as _req
+    config = ConfigurarEmail.objects.filter(ativo=True).first()
+    if not config:
+        return False, "Nenhuma configuração de e-mail ativa."
+    if not config.senha:
+        return False, "Senha / chave de API não configurada."
+
+    if config.usar_api:
+        try:
+            api_key  = (config.senha or '').strip()
+            remetente = (config.remetente or config.usuario or '').strip()
+            payload = {
+                'sender': {'email': remetente, 'name': 'Digiana'},
+                'to': [{'email': e} for e in destinatarios],
+                'subject': assunto,
+                'textContent': mensagem,
+            }
+            resp = _req.post(
+                'https://api.brevo.com/v3/smtp/email',
+                json=payload,
+                headers={
+                    'accept': 'application/json',
+                    'api-key': api_key,
+                    'content-type': 'application/json',
+                },
+                timeout=15,
+            )
+            if resp.status_code == 201:
+                return True, ''
+            erro = f"API Brevo: HTTP {resp.status_code} — {resp.text[:300]}"
+            return False, erro
+        except Exception as e:
+            return False, str(e) or f'{type(e).__name__}'
+
+    # fallback: envio SMTP convencional
+    try:
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=config.servidor_smtp, port=config.porta,
+            username=config.usuario, password=config.senha,
+            use_tls=config.use_tls, use_ssl=config.use_ssl,
+            timeout=15,
+        )
+        remetente = (config.remetente or config.usuario or '').strip()
+        EmailMessage(assunto, mensagem, remetente, destinatarios, connection=connection).send()
+        return True, ''
+    except Exception as e:
+        return False, str(e) or f'{type(e).__name__}'
+```
+
+### `requirements.txt` — dependência adicionada
+
+```
+requests==2.32.3
+```
+
+---
+
+## Passo a Passo Correto — Brevo API HTTP no Railway
+
+Este é o processo exato, na ordem correta, para que o envio de e-mail funcione em produção via Brevo.
+
+### 1. Criar Chave API no Brevo
+
+1. Acesse [app.brevo.com](https://app.brevo.com)
+2. Menu: **SMTP & API → aba "Chaves API e MCP"**
+3. Clique em **"+ Gere uma nova chave API"**
+4. Nome sugerido: `Digiana Produção`
+5. Clique em **Gerar**
+6. **Copie a chave imediatamente** — ela começa com `xkeysib-` e só é exibida uma vez
+
+> ⚠️ **Não confundir com a Chave SMTP** — a aba "Chaves SMTP" gera chaves `xsmtpsib-` que **não funcionam** na API HTTP. É obrigatório usar a aba **"Chaves API e MCP"** para obter a chave `xkeysib-`.
+
+### 2. Descobrir o IP de saída do Railway
+
+O Brevo bloqueia por padrão chamadas de IPs não autorizados. O Railway usa um IP de saída diferente do IP do seu domínio.
+
+**Como descobrir:** tente enviar um e-mail de teste pelo Digiana — se a chave API estiver correta mas o IP ainda não autorizado, o Brevo retorna:
+
+```
+HTTP 401 — {"code":"unrecognised IP address","message":"...,IP: 52.9.19.232"}
+```
+
+O IP aparece na própria mensagem de erro. No Railway, o IP de saída é **`52.9.19.232`**.
+
+> ⚠️ **Não confundir com o IP do domínio** — o IP `191.6.208.38` é o IP de entrada do domínio `anagma.com.br` (servidor de e-mail). O IP de saída do Railway (`52.9.19.232`) é diferente e é o que precisa ser autorizado.
+
+### 3. Autorizar o IP no Brevo
+
+1. Acesse **Brevo → Configurações → Segurança → aba "IPs autorizados"**
+2. Clique em **"Autorizar endereços IP"**
+3. Adicione: **`52.9.19.232`**
+4. Salve
+
+### 4. Verificar o remetente no Brevo
+
+1. Acesse **Brevo → Configurações → Remetentes, Domínios e IPs**
+2. Adicione e verifique o e-mail ou domínio que será usado como remetente
+3. Use e-mail do domínio próprio (ex: `noreply@anagma.com.br`) — remetentes Gmail tendem a cair em spam ou ser rejeitados por SPF
+
+### 5. Configurar no Digiana
+
+Acesse **Configurações de E-mail → Nova Configuração** e preencha:
+
+| Campo | Valor |
+|---|---|
+| Nome | `Brevo Produção` |
+| **Usar API HTTP** | ✅ ativado |
+| Servidor SMTP | `smtp-relay.brevo.com` *(ignorado no modo API)* |
+| Porta | `587` *(ignorado no modo API)* |
+| Usuário / Login SMTP | `ae6030001@smtp-brevo.com` *(ignorado no modo API)* |
+| **E-mail remetente** | e-mail verificado no Brevo (ex: `noreply@anagma.com.br`) |
+| **Senha** | chave API `xkeysib-...` copiada no passo 1 |
+| SSL | ❌ |
+| TLS | ❌ |
+
+Após salvar, ative a configuração pelo **toggle de Status** na lista e clique em **Enviar Teste**.
+
+### 6. Resultado esperado
+
+```
+✓ E-mail enviado com sucesso!
+Modo: API HTTP · Chave: xkeysib-... (11 chars)
+```
+
+---
+
+## Erros Comuns e Diagnóstico
+
+| Erro | Causa | Solução |
+|---|---|---|
+| `WORKER TIMEOUT` | Provedor bloqueia porta SMTP 465 ou 587 | Ativar modo **Usar API HTTP** |
+| `HTTP 401 — Key not found` | Usando chave SMTP (`xsmtpsib-`) no campo Senha | Criar Chave API na aba **"Chaves API e MCP"** — obtém `xkeysib-` |
+| `HTTP 401 — unrecognised IP address 52.9.19.232` | IP do Railway não autorizado no Brevo | Adicionar `52.9.19.232` em Brevo → Configurações → Segurança → IPs autorizados |
+| E-mail enviado mas não chega | Remetente Gmail rejeitado por SPF/DKIM | Usar remetente de domínio próprio verificado no Brevo |
+| `No migrations to apply` + aviso de mudanças | Migration criada localmente mas não commitada | `git add core/migrations/0021_*.py && git commit` antes do deploy |
+
+---
+
+## Informações de Referência — Ambiente de Produção
+
+| Item | Valor |
+|---|---|
+| Hospedagem | Railway |
+| IP de entrada (domínio `anagma.com.br`) | `191.6.208.38` |
+| **IP de saída do Railway** | **`52.9.19.232`** |
+| Login SMTP Brevo | `ae6030001@smtp-brevo.com` |
+| Endpoint API Brevo | `https://api.brevo.com/v3/smtp/email` |
+| Tipo de chave necessário | API (`xkeysib-`) — **não** SMTP (`xsmtpsib-`) |
+| Modo de envio ativo | API HTTP (porta 443) |
+| Plano Brevo | Gratuito — 300 e-mails/dia |
