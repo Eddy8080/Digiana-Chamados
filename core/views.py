@@ -382,11 +382,11 @@ def projeto_delete(request, pk):
 
 def disparar_email(assunto, mensagem, destinatarios):
     """Envia e-mail via SMTP configurado. Retorna (True, '') ou (False, mensagem_erro)."""
-    config = ConfigurarEmail.objects.first()
+    config = ConfigurarEmail.objects.filter(ativo=True).first()
     if not config:
-        return False, "Nenhuma configuração SMTP encontrada. Acesse Configuração de E-mail e salve os dados."
+        return False, "Nenhuma configuração SMTP ativa. Acesse Configuração de E-mail e ative uma."
     if not config.senha:
-        return False, "Senha SMTP não configurada. Acesse Configuração de E-mail e informe a senha."
+        return False, "Senha SMTP não configurada na configuração ativa. Acesse Configuração de E-mail."
     try:
         connection = get_connection(
             backend='core.email_backend.Py312SMTPEmailBackend',
@@ -1116,6 +1116,71 @@ def usuario_delete(request, pk):
 
 
 @login_required(login_url='login')
+def usuario_reset_senha(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method != 'POST':
+        return redirect('usuarios_list')
+    usuario = get_object_or_404(User, pk=pk)
+    if usuario == request.user:
+        messages.error(request, "Use 'Alterar Senha' para redefinir sua própria senha.")
+        return redirect('usuarios_list')
+    if usuario.is_superuser:
+        messages.error(request, "Não é possível redefinir a senha de um superusuário.")
+        return redirect('usuarios_list')
+
+    _alphabet = string.ascii_letters + string.digits + '!@#$'
+    temp_password = ''.join(secrets.choice(_alphabet) for _ in range(12))
+    usuario.set_password(temp_password)
+    usuario.save()
+
+    try:
+        perfil = usuario.perfil
+        perfil.must_change_password = True
+        perfil.save()
+    except PerfilUsuario.DoesNotExist:
+        pass
+
+    nome_completo = usuario.get_full_name() or usuario.username
+    resetado_por  = request.user.get_full_name() or request.user.username
+
+    ok_email, erro_email = disparar_email(
+        f"[Digiana] Sua senha foi redefinida — {nome_completo}",
+        (
+            f"Olá, {nome_completo}!\n\n"
+            f"Sua senha de acesso ao sistema Digiana foi redefinida pelo administrador {resetado_por}.\n\n"
+            f"Login:            {usuario.username}\n"
+            f"Senha temporária: {temp_password}\n\n"
+            f"Acesse o sistema e altere sua senha no próximo login. "
+            f"A troca de senha será exigida automaticamente.\n\n"
+            f"Esta é uma mensagem automática — não responda a este e-mail."
+        ),
+        [usuario.email],
+    ) if usuario.email else (False, "Usuário sem e-mail cadastrado.")
+
+    if not ok_email:
+        try:
+            usuario.perfil.email_verificar = True
+            usuario.perfil.save()
+        except Exception:
+            pass
+        messages.warning(
+            request,
+            f"Senha de '{usuario.username}' redefinida. "
+            f"E-mail não enviado — {erro_email} "
+            f"Informe a nova senha manualmente ao usuário.",
+        )
+    else:
+        messages.success(
+            request,
+            f"Senha de '{usuario.username}' redefinida e e-mail enviado para {usuario.email}.",
+        )
+
+    return redirect('usuarios_list')
+
+
+@login_required(login_url='login')
 def sistemas_list(request):
     if _role(request.user) != 'admin':
         messages.error(request, "Acesso negado.")
@@ -1174,9 +1239,13 @@ def perfil_foto_view(request):
         perfil = request.user.perfil
     except PerfilUsuario.DoesNotExist:
         return JsonResponse({'ok': False, 'erro': 'Perfil não encontrado.'}, status=400)
-    perfil.foto = foto
-    perfil.save()
-    return JsonResponse({'ok': True, 'url': perfil.foto.url})
+    try:
+        perfil.foto = foto
+        perfil.save()
+        return JsonResponse({'ok': True, 'url': perfil.foto.url})
+    except Exception as e:
+        logger.error("Erro ao salvar foto do perfil (user=%s): %s", request.user.username, e)
+        return JsonResponse({'ok': False, 'erro': 'Falha ao salvar a foto. Tente novamente.'}, status=500)
 
 
 @csrf_exempt
@@ -1201,7 +1270,7 @@ def upload_imagem_view(request):
     agora = timezone.now()
     caminho = f'ckeditor/{agora.year}/{agora.month:02d}/{uuid.uuid4().hex}{ext}'
     caminho_salvo = default_storage.save(caminho, ContentFile(upload.read()))
-    url = request.build_absolute_uri(settings.MEDIA_URL + caminho_salvo)
+    url = request.build_absolute_uri(default_storage.url(caminho_salvo))
 
     return JsonResponse({'url': url})
 
@@ -1218,9 +1287,9 @@ def testar_email_view(request):
     if not destinatario:
         return JsonResponse({'ok': False, 'erro': 'Informe um e-mail de destino para o teste.'})
 
-    config = ConfigurarEmail.objects.first()
+    config = ConfigurarEmail.objects.filter(ativo=True).first()
     if not config:
-        return JsonResponse({'ok': False, 'erro': 'Configuração SMTP não encontrada. Salve os dados primeiro.'})
+        return JsonResponse({'ok': False, 'erro': 'Nenhuma configuração SMTP ativa. Ative uma na lista de configurações.'})
 
     diagnostico = {
         'servidor': config.servidor_smtp,
@@ -1255,16 +1324,77 @@ def configurar_email_view(request):
     if _role(request.user) != 'admin':
         messages.error(request, "Acesso negado.")
         return redirect('dashboard')
+    configs = ConfigurarEmail.objects.all().order_by('-ativo', 'nome')
+    return render(request, 'core/configurar_email.html', {'configs': configs})
 
-    config = ConfigurarEmail.objects.first()
 
+@login_required(login_url='login')
+def configurar_email_create(request):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method == 'POST':
+        form = ConfigurarEmailForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Configuração criada com sucesso!")
+            return redirect('configurar_email')
+    else:
+        form = ConfigurarEmailForm()
+    return render(request, 'core/configurar_email_form.html', {
+        'form': form,
+        'title': 'Nova Configuração SMTP',
+    })
+
+
+@login_required(login_url='login')
+def configurar_email_update(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    config = get_object_or_404(ConfigurarEmail, pk=pk)
     if request.method == 'POST':
         form = ConfigurarEmailForm(request.POST, instance=config)
         if form.is_valid():
             form.save()
-            messages.success(request, "Configuração de e-mail salva com sucesso!")
+            messages.success(request, f"Configuração '{config.nome}' atualizada com sucesso!")
             return redirect('configurar_email')
     else:
         form = ConfigurarEmailForm(instance=config)
+    return render(request, 'core/configurar_email_form.html', {
+        'form': form,
+        'title': f'Editar — {config.nome}',
+        'config': config,
+    })
 
-    return render(request, 'core/configurar_email.html', {'form': form})
+
+@login_required(login_url='login')
+def configurar_email_ativar(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method != 'POST':
+        return redirect('configurar_email')
+    config = get_object_or_404(ConfigurarEmail, pk=pk)
+    ConfigurarEmail.objects.all().update(ativo=False)
+    config.ativo = True
+    config.save()
+    messages.success(request, f"'{config.nome}' ativada como configuração SMTP principal.")
+    return redirect('configurar_email')
+
+
+@login_required(login_url='login')
+def configurar_email_delete(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method != 'POST':
+        return redirect('configurar_email')
+    config = get_object_or_404(ConfigurarEmail, pk=pk)
+    if config.ativo:
+        messages.error(request, "Não é possível excluir a configuração ativa. Ative outra primeiro.")
+        return redirect('configurar_email')
+    nome = config.nome
+    config.delete()
+    messages.success(request, f"Configuração '{nome}' excluída.")
+    return redirect('configurar_email')

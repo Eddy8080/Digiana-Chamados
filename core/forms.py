@@ -301,21 +301,23 @@ _INPUT = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none
 class ConfigurarEmailForm(forms.ModelForm):
     senha = forms.CharField(
         required=False,
-        label="Senha / Senha de Aplicativo",
+        label="Senha / Token de API",
         widget=forms.PasswordInput(attrs={'class': _INPUT, 'autocomplete': 'new-password', 'placeholder': 'Deixe em branco para manter a atual'}),
     )
 
     class Meta:
         model = ConfigurarEmail
-        fields = ['servidor_smtp', 'porta', 'usuario', 'senha', 'use_ssl', 'use_tls']
+        fields = ['nome', 'servidor_smtp', 'porta', 'usuario', 'senha', 'use_ssl', 'use_tls']
         labels = {
+            'nome': 'Nome da configuração',
             'servidor_smtp': 'Servidor SMTP',
             'porta': 'Porta',
-            'usuario': 'E-mail remetente',
-            'use_ssl': 'Usar SSL — porta 465 (recomendado para Zoho)',
+            'usuario': 'Usuário / E-mail remetente',
+            'use_ssl': 'Usar SSL — porta 465',
             'use_tls': 'Usar TLS/STARTTLS — porta 587',
         }
         widgets = {
+            'nome': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Ex: Zoho Mail, Brevo Produção…'}),
             'servidor_smtp': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'smtp.zoho.com'}),
             'porta': forms.NumberInput(attrs={'class': _INPUT, 'placeholder': '465'}),
             'usuario': forms.EmailInput(attrs={'class': _INPUT, 'placeholder': 'seu@email.com'}),

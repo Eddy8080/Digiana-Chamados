@@ -9,6 +9,7 @@ urlpatterns = [
     path('usuarios/', views.usuarios_list, name='usuarios_list'),
     path('usuarios/<int:pk>/editar/', views.usuario_edit, name='usuario_edit'),
     path('usuarios/<int:pk>/excluir/', views.usuario_delete, name='usuario_delete'),
+    path('usuarios/<int:pk>/resetar-senha/', views.usuario_reset_senha, name='usuario_reset_senha'),
     path('alterar-senha/', views.alterar_senha_view, name='alterar_senha'),
 
     # Dashboard e Páginas principais
@@ -42,7 +43,11 @@ urlpatterns = [
 
     # Configuração de E-mail
     path('configuracao-email/', views.configurar_email_view, name='configurar_email'),
+    path('configuracao-email/nova/', views.configurar_email_create, name='configurar_email_create'),
     path('configuracao-email/testar/', views.testar_email_view, name='testar_email'),
+    path('configuracao-email/<int:pk>/editar/', views.configurar_email_update, name='configurar_email_update'),
+    path('configuracao-email/<int:pk>/ativar/', views.configurar_email_ativar, name='configurar_email_ativar'),
+    path('configuracao-email/<int:pk>/excluir/', views.configurar_email_delete, name='configurar_email_delete'),
 
     # Foto de perfil (qualquer usuário autenticado)
     path('perfil/foto/', views.perfil_foto_view, name='perfil_foto'),

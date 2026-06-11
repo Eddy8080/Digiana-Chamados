@@ -118,10 +118,12 @@ class PerfilUsuario(models.Model):
 
 
 class ConfigurarEmail(models.Model):
+    nome = models.CharField(max_length=100, default='Principal', verbose_name='Nome')
+    ativo = models.BooleanField(default=False, verbose_name='Ativo')
     servidor_smtp = models.CharField(max_length=200, default='smtp.zoho.com')
     porta = models.IntegerField(default=465)
     usuario = models.EmailField(default='dev@anagma.com.br')
-    senha = models.CharField(max_length=200, blank=True, null=True, help_text="Senha ou senha de aplicativo do Zoho Mail")
+    senha = models.CharField(max_length=200, blank=True, null=True, help_text="Senha ou senha de aplicativo")
     use_tls = models.BooleanField(default=False, help_text="STARTTLS — porta 587")
     use_ssl = models.BooleanField(default=True, help_text="SSL direto — porta 465 (recomendado Zoho)")
     atualizado_em = models.DateTimeField(auto_now=True)

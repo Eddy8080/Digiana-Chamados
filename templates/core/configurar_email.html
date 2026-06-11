@@ -1,102 +1,126 @@
 {% extends 'base.html' %}
 
-{% block title %}Configuração de E-mail — Digiana{% endblock %}
+{% block title %}Configurações SMTP — Digiana{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto space-y-6">
+<div class="max-w-4xl mx-auto space-y-6">
 
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900">Configuração de E-mail SMTP</h1>
-        <p class="text-slate-500 mt-1 text-sm">Defina o servidor responsável pelo envio automático de notificações de chamados.</p>
+    <!-- Cabeçalho -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Configurações de E-mail SMTP</h1>
+            <p class="text-slate-500 mt-1 text-sm">Apenas a configuração <strong>ativa</strong> é usada pelo sistema para envio de notificações.</p>
+        </div>
+        <a href="{% url 'configurar_email_create' %}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition whitespace-nowrap">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            Nova Configuração
+        </a>
     </div>
 
-    <!-- Card do formulário -->
+    <!-- Lista de configurações -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-
         <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-blue-500 flex-shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
             </svg>
-            <span class="text-sm font-semibold text-slate-600">Dados do servidor SMTP</span>
+            <span class="text-sm font-semibold text-slate-600">Servidores cadastrados</span>
         </div>
 
-        <form method="POST" autocomplete="off" class="p-6 space-y-5">
-            {% csrf_token %}
-
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.servidor_smtp.label }}</label>
-                {{ form.servidor_smtp }}
-                {% if form.servidor_smtp.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.servidor_smtp.errors.as_text }}</p>{% endif %}
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.porta.label }}</label>
-                {{ form.porta }}
-                <p class="text-xs text-slate-400 mt-1">Porta padrão: 587 (TLS) ou 465 (SSL)</p>
-                {% if form.porta.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.porta.errors.as_text }}</p>{% endif %}
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.usuario.label }}</label>
-                {{ form.usuario }}
-                {% if form.usuario.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.usuario.errors.as_text }}</p>{% endif %}
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ form.senha.label }}</label>
-                <div class="relative">
-                    {{ form.senha }}
-                    <button type="button" id="toggle-senha"
-                        class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition"
-                        tabindex="-1">
-                        <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                        </svg>
-                        <svg id="icon-eye-slash" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
-                    </button>
-                </div>
-                {% if form.senha.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.senha.errors.as_text }}</p>{% endif %}
-            </div>
-
-            <div class="space-y-3">
-                <p class="text-sm font-semibold text-slate-700">Tipo de criptografia</p>
-                <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div class="pt-0.5">{{ form.use_ssl }}</div>
-                    <div>
-                        <label for="{{ form.use_ssl.id_for_label }}" class="block text-sm font-semibold text-slate-700 cursor-pointer">{{ form.use_ssl.label }}</label>
-                        <p class="text-xs text-slate-400">Conexão SSL direta. Configuração padrão do Zoho Mail (porta 465).</p>
-                    </div>
-                </div>
-                <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div class="pt-0.5">{{ form.use_tls }}</div>
-                    <div>
-                        <label for="{{ form.use_tls.id_for_label }}" class="block text-sm font-semibold text-slate-700 cursor-pointer">{{ form.use_tls.label }}</label>
-                        <p class="text-xs text-slate-400">STARTTLS. Use apenas se o provedor não aceitar SSL na porta 465.</p>
-                    </div>
-                </div>
-                {% if form.non_field_errors %}<p class="text-xs text-rose-500">{{ form.non_field_errors.as_text }}</p>{% endif %}
-            </div>
-
-            <!-- Aviso Zoho -->
-            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mt-0.5 flex-shrink-0">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                </svg>
-                <span>Para o <strong>Zoho Mail</strong>: servidor <strong>smtp.zoho.com</strong>, porta <strong>465</strong>, SSL ativado. Se tiver autenticação em dois fatores, gere uma <strong>senha de aplicativo</strong> em Minha Conta → Segurança → Senhas de Aplicativo.</span>
-            </div>
-
-            <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                <a href="{% url 'dashboard' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
-                    Cancelar
-                </a>
-                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition">
-                    Salvar Configuração
-                </button>
-            </div>
-        </form>
+        {% if configs %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-100 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <th class="px-5 py-3">Nome</th>
+                        <th class="px-5 py-3">Servidor</th>
+                        <th class="px-5 py-3">Porta</th>
+                        <th class="px-5 py-3">Usuário / Remetente</th>
+                        <th class="px-5 py-3 text-center">Status</th>
+                        <th class="px-5 py-3 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for c in configs %}
+                    <tr class="{% if c.ativo %}bg-emerald-50/40{% endif %} hover:bg-slate-50 transition">
+                        <td class="px-5 py-4 font-semibold text-slate-800 whitespace-nowrap">
+                            {{ c.nome }}
+                        </td>
+                        <td class="px-5 py-4 font-mono text-slate-600 text-xs whitespace-nowrap">
+                            {{ c.servidor_smtp }}
+                        </td>
+                        <td class="px-5 py-4 text-slate-600 whitespace-nowrap">
+                            {{ c.porta }}
+                            <span class="ml-1 text-xs text-slate-400">{% if c.use_ssl %}SSL{% elif c.use_tls %}TLS{% endif %}</span>
+                        </td>
+                        <td class="px-5 py-4 text-slate-600 text-xs max-w-[180px] truncate" title="{{ c.usuario }}">
+                            {{ c.usuario }}
+                        </td>
+                        <td class="px-5 py-4 text-center whitespace-nowrap">
+                            {% if c.ativo %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Ativa
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-500 text-xs font-semibold rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                Inativa
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4">
+                            <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                                {% if not c.ativo %}
+                                <form method="POST" action="{% url 'configurar_email_ativar' c.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                                        </svg>
+                                        Ativar
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="{% url 'configurar_email_update' c.pk %}"
+                                   class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-semibold rounded-lg transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                                        <path d="M2.695 14.763l-1.262 3.155a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.886L17.5 5.501a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z" />
+                                    </svg>
+                                    Editar
+                                </a>
+                                {% if not c.ativo %}
+                                <form method="POST" action="{% url 'configurar_email_delete' c.pk %}"
+                                      onsubmit="return confirm('Excluir a configuração \'{{ c.nome }}\'?')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-semibold rounded-lg transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                                            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                                        </svg>
+                                        Excluir
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-slate-300 mx-auto mb-3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+            <p class="text-slate-500 text-sm">Nenhuma configuração SMTP cadastrada.</p>
+            <a href="{% url 'configurar_email_create' %}" class="mt-3 inline-block text-blue-600 hover:text-blue-700 text-sm font-semibold">Criar primeira configuração →</a>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Card de Teste -->
@@ -105,10 +129,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-emerald-500 flex-shrink-0">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            <span class="text-sm font-semibold text-slate-600">Testar envio de e-mail</span>
+            <span class="text-sm font-semibold text-slate-600">Testar configuração ativa</span>
         </div>
         <div class="p-6 space-y-4">
-            <p class="text-sm text-slate-500">Envia um e-mail de teste para verificar se a configuração SMTP está funcionando. O erro exato será exibido caso haja falha.</p>
+            <p class="text-sm text-slate-500">Envia um e-mail de teste usando a configuração <strong>ativa</strong>. O erro exato será exibido caso haja falha.</p>
             <div class="flex items-end gap-3">
                 <div class="flex-1">
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Destinatário do teste</label>
@@ -128,11 +152,7 @@
                     Enviar Teste
                 </button>
             </div>
-
-            <!-- Resultado do teste -->
             <div id="resultado-teste" class="hidden rounded-xl p-4 text-sm"></div>
-
-            <!-- Diagnóstico detalhado -->
             <div id="diagnostico-detalhe" class="hidden mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 space-y-1"></div>
         </div>
     </div>
@@ -140,21 +160,6 @@
 </div>
 
 <script>
-(function () {
-    var toggleBtn = document.getElementById('toggle-senha');
-    var input = document.getElementById('{{ form.senha.id_for_label }}');
-    var iconEye = document.getElementById('icon-eye');
-    var iconSlash = document.getElementById('icon-eye-slash');
-    if (toggleBtn && input) {
-        toggleBtn.addEventListener('click', function () {
-            var visible = input.type === 'text';
-            input.type = visible ? 'password' : 'text';
-            iconEye.classList.toggle('hidden', !visible);
-            iconSlash.classList.toggle('hidden', visible);
-        });
-    }
-})();
-
 (function () {
     var btn        = document.getElementById('btn-testar-email');
     var destInput  = document.getElementById('email-teste-dest');
@@ -168,7 +173,6 @@
         var dest = destInput.value.trim();
         if (!dest) { alert('Informe o e-mail de destino.'); return; }
 
-        // estado: carregando
         btn.disabled = true;
         iconNormal.classList.add('hidden');
         iconLoad.classList.remove('hidden');
@@ -179,29 +183,22 @@
         formData.append('destinatario', dest);
         formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-        fetch('{% url "testar_email" %}', {
-            method: 'POST',
-            body: formData,
-        })
+        fetch('{% url "testar_email" %}', { method: 'POST', body: formData })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             resultDiv.classList.remove('hidden');
             if (data.ok) {
                 resultDiv.className = 'rounded-xl p-4 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800';
-                resultDiv.innerHTML =
-                    '<strong>&#10003; E-mail enviado com sucesso!</strong><br>' +
-                    'Verifique a caixa de entrada (e spam) de <strong>' + data.destinatario + '</strong>.';
+                resultDiv.innerHTML = '<strong>&#10003; E-mail enviado com sucesso!</strong><br>Verifique a caixa de entrada (e spam) de <strong>' + data.destinatario + '</strong>.';
             } else {
                 resultDiv.className = 'rounded-xl p-4 text-sm bg-rose-50 border border-rose-200 text-rose-800';
-                resultDiv.innerHTML =
-                    '<strong>&#10007; Falha no envio</strong><br>' +
-                    '<span class="font-mono text-xs break-all">' + escapeHtml(data.erro || 'Erro desconhecido — verifique os logs do servidor.') + '</span>';
+                resultDiv.innerHTML = '<strong>&#10007; Falha no envio</strong><br><span class="font-mono text-xs break-all">' + escapeHtml(data.erro || 'Erro desconhecido.') + '</span>';
             }
             if (data.diagnostico) {
                 diagDiv.classList.remove('hidden');
                 var d = data.diagnostico;
                 diagDiv.innerHTML =
-                    '<div class="font-semibold text-slate-500 mb-1">Configuração usada:</div>' +
+                    '<div class="font-semibold text-slate-500 mb-1">Configuração ativa usada:</div>' +
                     '<div>Servidor: ' + escapeHtml(d.servidor) + ':' + d.porta + '</div>' +
                     '<div>Usuário:  ' + escapeHtml(d.usuario) + '</div>' +
                     '<div>SSL: ' + (d.ssl ? 'Sim' : 'Não') + '  |  TLS: ' + (d.tls ? 'Sim' : 'Não') + '</div>' +
@@ -221,11 +218,7 @@
     });
 
     function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 })();
 </script>
