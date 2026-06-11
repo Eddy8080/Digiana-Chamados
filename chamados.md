@@ -3131,9 +3131,51 @@ Modo: API HTTP · Chave: xkeysib-... (11 chars)
 |---|---|---|
 | `WORKER TIMEOUT` | Provedor bloqueia porta SMTP 465 ou 587 | Ativar modo **Usar API HTTP** |
 | `HTTP 401 — Key not found` | Usando chave SMTP (`xsmtpsib-`) no campo Senha | Criar Chave API na aba **"Chaves API e MCP"** — obtém `xkeysib-` |
-| `HTTP 401 — unrecognised IP address 52.9.19.232` | IP do Railway não autorizado no Brevo | Adicionar `52.9.19.232` em Brevo → Configurações → Segurança → IPs autorizados |
+| `HTTP 401 — unrecognised IP address 52.9.19.232` | IP do Railway não autorizado no Brevo | Adicionar o IP em Brevo → Configurações → Segurança → IPs autorizados |
+| `HTTP 401 — unrecognised IP address 152.55.176.243` | Railway mudou o IP de saída em novo deploy | Adicionar o novo IP no Brevo (IP aparece na mensagem de erro) |
 | E-mail enviado mas não chega | Remetente Gmail rejeitado por SPF/DKIM | Usar remetente de domínio próprio verificado no Brevo |
+| E-mail não chega para @anagma.com.br | Domínio não verificado no Brevo — SPF falha no Zoho | Verificar domínio `anagma.com.br` no Brevo + adicionar registros DNS *(pendente)* |
 | `No migrations to apply` + aviso de mudanças | Migration criada localmente mas não commitada | `git add core/migrations/0021_*.py && git commit` antes do deploy |
+
+---
+
+## Estudo — IP Estático no Railway (plano Trial/Hobby)
+
+### Problema
+
+O Railway usa um **pool rotativo de IPs de saída** — o IP pode mudar a cada redeploy ou reinício do container. Isso é incompatível com a lista de IPs autorizados do Brevo, que exige que o IP seja conhecido previamente.
+
+IPs de saída observados até agora:
+- `52.9.19.232` — primeiro deploy
+- `152.55.176.243` — deploy seguinte
+
+### Tentativa de solução — IP estático no Railway
+
+Acessamos **Railway → Digiana-Chamados → Settings → Networking** e verificamos as opções disponíveis:
+
+| Opção encontrada | O que faz |
+|---|---|
+| Custom Domain | Configura domínio próprio para acesso HTTP de entrada |
+| TCP Proxy | Cria proxy TCP para conexões de **entrada** (não resolve IP de saída) |
+| Private Networking | Comunicação interna entre serviços Railway |
+| Outbound IPv6 | Toggle para habilitar saída em IPv6 |
+| **Static Outbound IP** | **Não disponível** — requer plano Pro |
+
+### Por que não foi possível
+
+O Railway **não oferece IP estático de saída no plano Trial/Hobby**. A opção "Static Outbound IP" só existe no plano **Pro ($20/mês)**. No plano gratuito/trial, o IP de saída faz parte de um pool compartilhado entre vários usuários e pode mudar sem aviso.
+
+### Soluções possíveis
+
+| Solução | Custo | Complexidade |
+|---|---|---|
+| Upgrade Railway para plano Pro | $20/mês | Baixa — 1 clique + adicionar 1 IP no Brevo |
+| Manter IP manualmente no Brevo | Gratuito | Baixa — adicionar o novo IP quando o erro aparecer |
+| Verificar domínio `anagma.com.br` no Brevo | Gratuito | Média — configuração DNS *(resolve @anagma.com.br mas não o IP rotativo)* |
+
+### Decisão atual
+
+Manutenção manual do IP no Brevo: quando um novo IP aparecer na mensagem de erro `HTTP 401 — unrecognised IP address X.X.X.X`, basta adicionar esse IP em **Brevo → Configurações → Segurança → IPs autorizados**.
 
 ---
 
@@ -3141,11 +3183,12 @@ Modo: API HTTP · Chave: xkeysib-... (11 chars)
 
 | Item | Valor |
 |---|---|
-| Hospedagem | Railway |
+| Hospedagem | Railway (plano Trial → Hobby) |
 | IP de entrada (domínio `anagma.com.br`) | `191.6.208.38` |
-| **IP de saída do Railway** | **`52.9.19.232`** |
+| **IPs de saída do Railway (rotativos)** | `52.9.19.232`, `152.55.176.243` |
 | Login SMTP Brevo | `ae6030001@smtp-brevo.com` |
 | Endpoint API Brevo | `https://api.brevo.com/v3/smtp/email` |
 | Tipo de chave necessário | API (`xkeysib-`) — **não** SMTP (`xsmtpsib-`) |
 | Modo de envio ativo | API HTTP (porta 443) |
 | Plano Brevo | Gratuito — 300 e-mails/dia |
+| Plano Railway | Trial/Hobby — sem IP estático de saída |
