@@ -2402,9 +2402,9 @@ Oito modelos:
 | `Sistema` | `nome`, `descricao`, `ativo`, `criado_em` |
 | `Cliente` | `nome`, `cpf_cnpj`, `email`, `telefone`, `criado_em` |
 | `Projeto` | `cliente` (FK), `nome`, `descricao`, `criado_em` |
-| `Chamado` | `projeto`, `sistema` (FK, opcional), `titulo`, `descricao`, `status`, `prioridade`, `responsavel`, `observadores` (M2M), `criado_por`, `criado_em`, `atualizado_em` |
+| `Chamado` | `projeto`, `sistema` (FK, opcional), `titulo`, `descricao`, `status`, `prioridade`, `responsavel`, `observadores` (M2M), `criado_por`, `criado_em`, `atualizado_em`, `fechado_em`, `excluido`, `excluido_em`, `excluido_por` (FK, SET_NULL), `motivo_exclusao` |
 | `PerfilUsuario` | `user` (OneToOne), `role`, `must_change_password`, `cliente` (FK, opcional), `celular`, `whatsapp`, `telefone_fixo`, `email_verificar`, `foto` (ImageField, opcional) |
-| `ConfigurarEmail` | `servidor_smtp`, `porta`, `usuario`, `senha`, `use_tls`, `use_ssl`, `atualizado_em` |
+| `ConfigurarEmail` | `nome`, `ativo`, `servidor_smtp`, `porta`, `usuario`, `remetente`, `senha`, `use_tls`, `use_ssl`, `usar_api`, `atualizado_em` |
 | `Resposta` | `chamado` (FK), `autor` (FK nullable), `conteudo`, `criado_em`, `resposta_pai` (FK self, nullable) |
 | `Anexo` | `chamado` (FK), `resposta` (FK nullable), `arquivo`, `nome_original`, `tipo_mime`, `criado_em`, `criado_por` (FK nullable) |
 
@@ -2424,7 +2424,8 @@ Oito modelos:
 | `_status_permitido(status_novo, user, chamado=None)` | Guard server-side: impede `pendente` para não-admin/dev; impede `fechado` para não-admin/não-responsável |
 | `_salvar_anexos(request, chamado)` | Persiste arquivos do `request.FILES['anexos']` como objetos `Anexo` de chamado (máx 20 MB, `resposta=None`) |
 | `_salvar_anexos_resposta(request, chamado, resposta)` | Persiste arquivos do `request.FILES['anexos']` como objetos `Anexo` vinculados a uma `Resposta` específica (máx 20 MB) |
-| `disparar_email(assunto, mensagem, destinatarios)` | Envia e-mail via `ConfigurarEmail` singleton via `Py312SMTPEmailBackend`; retorna **tupla `(bool, str)`** — `(True, '')` ou `(False, mensagem_erro)` |
+| `_registrar_fechamento(chamado, status_anterior)` | Seta `fechado_em=now()` ao mudar status para `fechado`; limpa `fechado_em=None` ao reverter de `fechado` — chamado antes de `.save()` nas views de edição |
+| `disparar_email(assunto, mensagem, destinatarios)` | Envia e-mail via `ConfigurarEmail` ativo; modo API HTTP Brevo (`usar_api=True`, chave `xkeysib-`, endpoint `https://api.brevo.com/v3/smtp/email`) ou fallback SMTP convencional; retorna **tupla `(bool, str)`** — `(True, '')` ou `(False, mensagem_erro)` |
 
 **Views com URL:**
 
@@ -2458,8 +2459,14 @@ Oito modelos:
 | `usuario_edit` | GET/POST | Somente admin |
 | `usuario_delete` | POST | Somente admin |
 | `usuario_reset_senha` | POST | Somente admin — gera senha temporária, envia e-mail, força `must_change_password=True` |
-| `configurar_email_view` | GET/POST | Somente admin |
+| `configurar_email_view` | GET | Somente admin — lista todas as configurações SMTP |
+| `configurar_email_create` | GET/POST | Somente admin — cria nova configuração SMTP |
+| `configurar_email_update` | GET/POST | Somente admin — edita configuração existente |
+| `configurar_email_ativar` | POST | Somente admin — ativa uma configuração (desativa todas as demais) |
+| `configurar_email_toggle` | POST | Somente admin — alterna ativo/inativo (toggle iOS-style na lista) |
+| `configurar_email_delete` | POST | Somente admin — exclui configuração SMTP |
 | `testar_email_view` | POST | Somente admin — envia e-mail de teste; retorna JSON `{ok, erro, diagnostico}` |
+| `relatorios_view` | GET | Somente admin — relatórios mensal/anual com métricas ITIL 4 e gráfico de barras |
 | `perfil_foto_view` | POST | Autenticado — salva foto em `media/avatares/`; retorna JSON `{ok, url}` |
 | `upload_imagem_view` | POST | Autenticado — `@csrf_exempt`, salva imagem em `media/ckeditor/YYYY/MM/` |
 
@@ -2477,7 +2484,7 @@ Oito modelos:
 | `ObservadorChoiceField` | — | `ModelMultipleChoiceField` com `label_from_instance` usando `_label_usuario()`; queryset: todos os roles, sem superusuário |
 | `ChamadoForm` | `Chamado` | `projeto`, `sistema` (campo explícito, `required=False`, `empty_label='— Nenhum sistema —'`), `titulo`, `descricao`, `status`, `prioridade`, `responsavel` (campo explícito), `observadores` |
 | `SistemaForm` | `Sistema` | `nome`, `descricao`, `ativo` |
-| `ConfigurarEmailForm` | `ConfigurarEmail` | `servidor_smtp`, `porta`, `usuario`, `senha`, `use_ssl`, `use_tls` |
+| `ConfigurarEmailForm` | `ConfigurarEmail` | `nome`, `usar_api`, `servidor_smtp`, `porta`, `usuario`, `remetente`, `senha`, `use_ssl`, `use_tls` — campo `senha` é `PasswordInput` com `required=False` (em branco mantém senha atual) |
 
 ### `core/urls.py`
 
@@ -2522,9 +2529,17 @@ Oito modelos:
 /sistemas/novo/                  → sistema_create
 /sistemas/<pk>/editar/           → sistema_update
 
-# Configuração
-/configuracao-email/             → configurar_email_view (admin only)
-/configuracao-email/testar/      → testar_email_view     (POST, JSON, admin only)
+# Relatórios (admin only)
+/relatorios/                     → relatorios_view
+
+# Configuração de e-mail (admin only)
+/configuracao-email/             → configurar_email_view      (lista)
+/configuracao-email/nova/        → configurar_email_create    (nova config)
+/configuracao-email/testar/      → testar_email_view          (POST, JSON)
+/configuracao-email/<pk>/editar/ → configurar_email_update
+/configuracao-email/<pk>/ativar/ → configurar_email_ativar    (POST)
+/configuracao-email/<pk>/toggle/ → configurar_email_toggle    (POST)
+/configuracao-email/<pk>/excluir/→ configurar_email_delete    (POST)
 
 # Foto de perfil (qualquer usuário autenticado)
 /perfil/foto/                    → perfil_foto_view      (POST, JSON, @login_required)
@@ -2539,11 +2554,14 @@ Oito modelos:
 ### `setup/settings.py` — Configurações relevantes
 
 ```python
-INSTALLED_APPS = [..., 'core']
+INSTALLED_APPS = [..., 'cloudinary_storage', 'cloudinary', 'core']
 
 MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',   # serve estáticos (produção)
     ...
-    'core.middleware.ForcePasswordChangeMiddleware',  # último na lista
+    'core.middleware.ForcePasswordChangeMiddleware',
+    'core.middleware.SecurityHeadersMiddleware',    # CSP, Permissions-Policy, X-XSS
 ]
 
 TEMPLATES = [{
@@ -2556,6 +2574,15 @@ TEMPLATES = [{
 
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+SITE_URL = os.environ.get('SITE_URL', f'https://{_railway_domain}' if _railway_domain else '')
+
+# Cloudinary — armazenamento de mídia em produção (variáveis no Railway)
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'  # se CLOUDINARY_CLOUD_NAME definido
+
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 ```
 
 ---
@@ -2581,6 +2608,11 @@ TIME_ZONE = 'America/Sao_Paulo'
 | `0015_perfilusuario_email_verificar.py` | Adiciona campo `email_verificar` ao `PerfilUsuario` |
 | `0016_auto_20260610_0954.py` | Cria modelo `Resposta`; adiciona campo `resposta` (FK nullable) ao `Anexo` |
 | `0017_perfilusuario_foto.py` | Adiciona campo `foto` (ImageField, `upload_to='avatares/'`) ao `PerfilUsuario` |
+| `0018_configuraremail_nome_ativo.py` | Adiciona `nome` (CharField, default `'Principal'`) e `ativo` (BooleanField, default `False`) ao `ConfigurarEmail` — habilita múltiplas configs com toggle de ativação |
+| `0019_configuraremail_remetente.py` | Adiciona `remetente` (EmailField nullable) ao `ConfigurarEmail` — endereço "De:" separado do login SMTP |
+| `0020_alter_configuraremail_senha.py` | Amplia `max_length` do campo `senha` no `ConfigurarEmail` (para acomodar tokens de API Brevo `xkeysib-...`) |
+| `0021_configuraremail_usar_api.py` | Adiciona `usar_api` (BooleanField, default `False`) ao `ConfigurarEmail` — modo API HTTP Brevo sem usar SMTP |
+| `0022_chamado_excluido_chamado_excluido_em_and_more.py` | Adiciona `fechado_em`, `excluido`, `excluido_em`, `excluido_por` (FK), `motivo_exclusao` ao `Chamado`; `RunPython` retroativo para preencher `fechado_em` em chamados já fechados |
 
 ---
 
