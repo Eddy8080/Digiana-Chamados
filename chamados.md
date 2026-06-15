@@ -3165,17 +3165,43 @@ Acessamos **Railway → Digiana-Chamados → Settings → Networking** e verific
 
 O Railway **não oferece IP estático de saída no plano Trial/Hobby**. A opção "Static Outbound IP" só existe no plano **Pro ($20/mês)**. No plano gratuito/trial, o IP de saída faz parte de um pool compartilhado entre vários usuários e pode mudar sem aviso.
 
+### O que o plano Pro ($20/mês) oferece
+
+| Recurso | Trial/Hobby | Pro ($20/mês) |
+|---|:---:|:---:|
+| Static Outbound IP | ❌ | ✅ |
+| Créditos de uso incluídos | $5 | $20 |
+| Execução contínua (sem sleep) | ❌ | ✅ |
+| Suporte prioritário | ❌ | ✅ |
+| Múltiplos ambientes (staging/prod) | Limitado | ✅ |
+| SLA de uptime | Sem garantia | 99,9% |
+
+**Por que o Static Outbound IP resolve o problema com Brevo:**
+- No Pro, o Railway provisiona **um único IP fixo** para saída de todo o serviço
+- Esse IP nunca muda enquanto o serviço existir
+- Basta adicionar esse IP uma única vez no Brevo → IPs autorizados
+- Nunca mais aparece erro `HTTP 401 — unrecognised IP address`
+
+**Como ativar quando fizer upgrade:**
+1. Acesse **Railway → Digiana-Chamados → Settings → Networking**
+2. A seção **"Static Outbound IP"** aparecerá disponível
+3. Clique em **"Enable"** — o Railway provisiona o IP fixo
+4. Copie o IP gerado e adicione no Brevo → Configurações → Segurança → IPs autorizados
+5. Remova os IPs antigos (`52.9.19.232` e `152.55.176.243`) da lista do Brevo
+
 ### Soluções possíveis
 
-| Solução | Custo | Complexidade |
-|---|---|---|
-| Upgrade Railway para plano Pro | $20/mês | Baixa — 1 clique + adicionar 1 IP no Brevo |
-| Manter IP manualmente no Brevo | Gratuito | Baixa — adicionar o novo IP quando o erro aparecer |
-| Verificar domínio `anagma.com.br` no Brevo | Gratuito | Média — configuração DNS *(resolve @anagma.com.br mas não o IP rotativo)* |
+| Solução | Custo | Complexidade | Status |
+|---|---|---|---|
+| Upgrade Railway para plano Pro | $20/mês | Baixa — 1 clique + 1 IP no Brevo | Pendente |
+| Manter IP manualmente no Brevo | Gratuito | Baixa — adicionar o novo IP quando o erro aparecer | **Em uso** |
+| Verificar domínio `anagma.com.br` no Brevo | Gratuito | Média — configuração DNS | Pendente *(resolve @anagma.com.br, não o IP rotativo)* |
 
 ### Decisão atual
 
 Manutenção manual do IP no Brevo: quando um novo IP aparecer na mensagem de erro `HTTP 401 — unrecognised IP address X.X.X.X`, basta adicionar esse IP em **Brevo → Configurações → Segurança → IPs autorizados**.
+
+Quando o projeto justificar o custo do plano Pro, o upgrade elimina essa manutenção definitivamente.
 
 ---
 
