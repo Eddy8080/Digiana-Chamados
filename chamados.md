@@ -3252,3 +3252,292 @@ Quando o projeto justificar o custo do plano Pro, o upgrade elimina essa manuten
 | Modo de envio ativo | API HTTP (porta 443) |
 | Plano Brevo | Gratuito — 300 e-mails/dia |
 | Plano Railway | Trial/Hobby — sem IP estático de saída |
+
+---
+
+## Implementação 42 — Soft Delete de Chamados (Etapas 4–8)
+
+### Contexto
+
+Substituição do hard delete (`chamado.delete()`) por exclusão lógica (soft delete). Chamados excluídos permanecem no banco para fins de auditoria e relatórios, mas ficam invisíveis nas operações do dia a dia.
+
+### Novos campos em `Chamado` (migration 0022)
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `fechado_em` | `DateTimeField(null=True, blank=True)` | Data/hora real de fechamento (preenchida ao mudar status para `fechado`) |
+| `excluido` | `BooleanField(default=False)` | Flag de exclusão lógica |
+| `excluido_em` | `DateTimeField(null=True, blank=True)` | Data/hora da exclusão |
+| `excluido_por` | FK → `User` (`SET_NULL, null=True, blank=True`) | Quem excluiu — `related_name='chamados_excluidos'` |
+| `motivo_exclusao` | `TextField(blank=True, null=True)` | Motivo informado no momento da exclusão |
+
+### Migration 0022
+
+Arquivo: `core/migrations/0022_chamado_excluido_chamado_excluido_em_and_more.py`
+
+Além dos cinco `AddField`, contém uma `RunPython` de data migration para retroativamente preencher `fechado_em` nos chamados já fechados:
+
+```python
+def preencher_fechado_em(apps, schema_editor):
+    Chamado = apps.get_model('core', 'Chamado')
+    Chamado.objects.filter(status='fechado', fechado_em__isnull=True).update(
+        fechado_em=models.F('atualizado_em')
+    )
+```
+
+### Helper `_registrar_fechamento`
+
+```python
+def _registrar_fechamento(chamado, status_anterior=None):
+    if chamado.status == 'fechado' and not chamado.fechado_em:
+        chamado.fechado_em = timezone.now()
+    elif status_anterior == 'fechado' and chamado.status != 'fechado':
+        chamado.fechado_em = None
+```
+
+Chamado em `chamado_detail` (POST, edição) e em `chamado_update` antes de `.save()`, passando `status_anterior` para limpar `fechado_em` quando o chamado é reaberto por edição de status.
+
+### Filtro `excluido=False` em todas as queries operacionais
+
+Todas as consultas que alimentam operações do usuário foram ajustadas:
+
+| View / Query | Antes | Depois |
+|---|---|---|
+| `dashboard` — queryset de chamados | `Chamado.objects.filter(...)` | `Chamado.objects.filter(..., excluido=False)` |
+| `dashboard_stats` — totalizadores JSON | sem filtro | `excluido=False` |
+| `chamados_list` | sem filtro | `excluido=False` |
+| `chamado_detail` (`get_object_or_404`) | sem filtro | `.filter(excluido=False)` no queryset |
+| `chamado_update` (`get_object_or_404`) | sem filtro | `pk=pk, excluido=False` |
+| `chamado_responder` (`get_object_or_404`) | sem filtro | `pk=pk, excluido=False` |
+| `chamado_reopen` (`get_object_or_404`) | sem filtro | `pk=pk, excluido=False` |
+| `projetos_list` — anotação `num_chamados_abertos` | sem filtro | `chamados__excluido=False` no `Q()` de Count |
+
+### Nova lógica de `chamado_delete`
+
+`chamado_delete` deixou de chamar `chamado.delete()`. Agora realiza soft delete:
+
+1. Requer `motivo` via POST (`motivo_exclusao`) — erro 400 se vazio.
+2. Guarda título/projeto/nomes antes de modificar (para o e-mail).
+3. Seta `excluido=True`, `excluido_em=timezone.now()`, `excluido_por=request.user`, `motivo_exclusao=motivo`.
+4. `.save(update_fields=[...])` — atômico, não toca outros campos.
+5. Envia e-mail de notificação aos destinatários do chamado com o motivo.
+6. Redireciona para `dashboard` com mensagem de sucesso.
+
+Guard adicional: se `chamado.excluido` já for `True` ao entrar na view, retorna com `messages.info` sem reprocessar.
+
+---
+
+## Implementação 43 — Relatórios Admin com Métricas ITIL 4
+
+### Contexto
+
+Nova seção de relatórios exclusiva para `admin`, acessível por botão no dashboard. Permite análise de desempenho por período (mensal ou anual) com as principais métricas ITIL 4 e gráfico de barras de fechamentos.
+
+### Arquivos criados / alterados
+
+| Arquivo | Mudança |
+|---|---|
+| `core/views.py` | Nova view `relatorios_view` |
+| `core/urls.py` | Nova rota `relatorios/` → `relatorios_view` |
+| `templates/core/relatorios.html` | Novo template |
+
+### URL adicionada
+
+```python
+path('relatorios/', views.relatorios_view, name='relatorios'),
+```
+
+### View `relatorios_view`
+
+Acesso restrito a `admin` (`_role(request.user) != 'admin'` → redirect dashboard).
+
+**Parâmetros GET:**
+
+| Parâmetro | Default | Valores válidos |
+|---|---|---|
+| `modo` | `mensal` | `mensal` / `anual` |
+| `ano` | ano atual | inteiro (últimos 5 anos) |
+| `mes` | mês atual | 1–12 |
+
+**Querysets:**
+
+| Queryset | Filtro |
+|---|---|
+| `criados_qs` | `criado_em` dentro do intervalo (inclui excluídos — são chamados que existiram) |
+| `fechados_qs` | `excluido=False`, `status='fechado'`, `fechado_em` dentro do intervalo |
+| `excluidos_qs` | `excluido=True`, `excluido_em` dentro do intervalo |
+| `operacionais_qs` | `excluido=False` (todos os status, sem filtro de data — snapshot atual) |
+
+**Métricas calculadas:**
+
+| Métrica | Cálculo |
+|---|---|
+| `total_criados` | `criados_qs.count()` |
+| `total_fechados` | `fechados_qs.count()` |
+| `total_excluidos` | `excluidos_qs.count()` |
+| `taxa_fechamento` | `(total_fechados / total_criados) * 100` |
+| `status_operacional` | dict com contagens por status (`abertos`, `em_progresso`, `pendentes`, `resolvidos`, `fechados`) do queryset sem filtro de data |
+
+**Gráfico de barras (`chart_points`):**
+
+- Modo anual: 12 pontos, um por mês (labels abreviados: `Jan`, `Fev` etc.)
+- Modo mensal: N pontos, um por dia do mês (labels: `1`, `2`, …)
+- Cada ponto: `{label, fechados, excluidos, fechados_pct, excluidos_pct}`
+- Percentual normalizado pelo maior valor do período (`max_chart_value`); mínimo 4% quando valor > 0 (evita barra invisível)
+
+### Template `relatorios.html`
+
+- Filtros: toggle `mensal/anual`, select de ano, select de mês (oculto no modo anual)
+- 4 cards de métricas: Total Criados, Total Fechados, Total Excluídos, Taxa de Fechamento
+- Bloco "Situação Operacional Atual": contadores por status
+- Gráfico de barras horizontal (fechados em azul, excluídos em âmbar) com legenda
+
+---
+
+## Implementação 44 — Reorganização do Nav (Breakpoint xl) e Menu Hamburger Completo
+
+### Contexto
+
+Ao adicionar "Relatórios" ao navbar, o nav desktop passou a ter 8 itens para admin. No breakpoint `md` (768px), o total de largura dos itens (~740px) ultrapassava o espaço disponível (~500px em tablets), fazendo o botão "⚙ E-mail SMTP" descer e sobrepor o toggle dark/light no canto direito.
+
+### Solução
+
+**Breakpoint do nav desktop:** mudado de `md` (768px) para `xl` (1280px), onde há espaço suficiente para todos os itens admin na mesma linha.
+
+| Elemento | Antes | Depois |
+|---|---|---|
+| Nav desktop | `hidden md:flex` | `hidden xl:flex` |
+| Hamburger button | `md:hidden` | `xl:hidden` |
+| Mobile menu container | `md:hidden hidden flex-col` | `xl:hidden hidden flex-col` |
+
+**Menu hamburger completado:** os itens admin "Sistemas", "Usuários" e "⚙ E-mail SMTP" estavam ausentes do menu mobile. Todos foram adicionados dentro do bloco `{% if user_role == 'admin' %}` do menu móvel, mantendo as mesmas classes e condicionais de role do nav desktop.
+
+**Saudação restaurada ao navbar:** `<span class="hidden xl:inline ...">Olá, <strong>{{ user.get_full_name|default:user.username }}</strong></span>` — visível apenas em telas ≥ 1280px onde há espaço.
+
+**"Relatórios" removido do nav:** o link foi retirado do nav desktop e do menu mobile para não contribuir com o overflow. O acesso à tela de relatórios foi movido para um botão dedicado no dashboard (ver Impl. 45).
+
+---
+
+## Implementação 45 — Botão "Ver Relatórios" no Dashboard
+
+### Contexto
+
+Após remover o link "Relatórios" do navbar (Impl. 44), o acesso à tela de relatórios foi reposicionado como um botão estilizado acima dos cards de métricas no dashboard, visível apenas para `admin`.
+
+### Localização no template
+
+`templates/core/dashboard.html` — imediatamente antes do grid de cards de métricas, dentro do bloco de conteúdo principal.
+
+### Código adicionado
+
+```html
+{% if user_role == 'admin' %}
+<div>
+    <a href="{% url 'relatorios' %}"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-cyan-200 shadow-sm text-sm font-semibold text-cyan-700 hover:bg-cyan-50 hover:border-cyan-400 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-cyan-500">
+            <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z"/>
+        </svg>
+        Ver Relatórios
+    </a>
+</div>
+{% endif %}
+```
+
+Estilo: pill (`rounded-full`), borda ciano suave, fundo branco, hover com preenchimento ciano claro. Ícone de gráfico de barras (Heroicons).
+
+---
+
+## Implementação 46 — View de Falha CSRF Personalizada
+
+### Contexto
+
+Em desenvolvimento, ao reiniciar o servidor Django (que acontece automaticamente ao salvar arquivos Python via `runserver --reload`), o cookie CSRF do browser fica com um token inválido. A tentativa de login seguinte resultava em HTTP 403 com a página de erro padrão do Django, sem nenhuma orientação ao usuário.
+
+### Solução
+
+**View `csrf_failure` em `core/views.py`** (adicionada antes de `login_view`):
+
+```python
+def csrf_failure(request, reason=""):
+    messages.error(request, "Sessão expirada ou token inválido. Recarregue e tente novamente.")
+    return redirect('login')
+```
+
+**Registro em `setup/settings.py`** (após `SECURE_CONTENT_TYPE_NOSNIFF = True`):
+
+```python
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+```
+
+**Comportamento resultante:** em vez da página 403 padrão, o usuário é redirecionado para `/login/` com uma mensagem de erro amigável na interface. O token CSRF correto é reenviado com a resposta GET da página de login.
+
+**Workaround em dev:** após reiniciar o servidor, limpar cookies do browser ou fazer hard-refresh na página de login antes de submeter o formulário.
+
+---
+
+## Atualizações na Tabela de Estado dos Arquivos
+
+### `core/models.py` — campos adicionados ao `Chamado`
+
+A tabela de modelos do `Chamado` agora inclui:
+
+| Campo | Descrição |
+|---|---|
+| `fechado_em` | `DateTimeField(null=True)` — preenchido pelo helper `_registrar_fechamento` |
+| `excluido` | `BooleanField(default=False)` — flag de soft delete |
+| `excluido_em` | `DateTimeField(null=True)` — data/hora da exclusão lógica |
+| `excluido_por` | FK → `User` (SET_NULL) — quem executou a exclusão |
+| `motivo_exclusao` | `TextField(blank=True, null=True)` — motivo obrigatório na UI |
+
+### `core/views.py` — helpers adicionados
+
+| Helper | Descrição |
+|---|---|
+| `_registrar_fechamento(chamado, status_anterior)` | Gerencia `fechado_em`: seta ao fechar, limpa ao reabrir via edição de status |
+| `csrf_failure(request, reason)` | Substitui a página 403 padrão do CSRF; redireciona para login com mensagem amigável |
+
+### `core/views.py` — views adicionadas
+
+| View | Método | Proteção |
+|---|---|---|
+| `relatorios_view` | GET | Somente admin — relatórios mensal/anual, métricas, gráfico |
+
+### `core/urls.py` — rota adicionada
+
+```
+/relatorios/    → relatorios_view    (somente admin)
+```
+
+### `setup/settings.py` — configuração adicionada
+
+```python
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+```
+
+### `core/migrations/0022_chamado_excluido_chamado_excluido_em_and_more.py`
+
+| Operation | Detalhe |
+|---|---|
+| `AddField fechado_em` | `DateTimeField(null=True, blank=True)` |
+| `AddField excluido` | `BooleanField(default=False)` |
+| `AddField excluido_em` | `DateTimeField(null=True, blank=True)` |
+| `AddField excluido_por` | FK → `User` (SET_NULL, `related_name='chamados_excluidos'`) |
+| `AddField motivo_exclusao` | `TextField(blank=True, null=True)` |
+| `RunPython preencher_fechado_em` | Retroativamente seta `fechado_em = atualizado_em` para chamados `status='fechado'` já existentes |
+
+---
+
+## Decisões de Arquitetura — Adições
+
+**Por que soft delete e não hard delete?** Chamados excluídos são dados de auditoria: quem excluiu, quando, por quê. O hard delete apagava essa trilha. O soft delete preserva o registro no banco com `excluido=True` e só o exclui das queries operacionais via filtro. A tela de relatórios pode então contabilizar exclusões por período, diferenciando encerramentos formais (fechados) de descontinuações (excluídos).
+
+**Por que exigir motivo na exclusão?** A exclusão sem motivo é uma ação opaca — não é possível distinguir "chamado duplicado", "solicitação cancelada" ou "erro de cadastro" sem contexto. O campo `motivo_exclusao` obrigatório (validado na view, não no modelo) impede exclusões acidentais e cria histórico útil para gestão.
+
+**Por que `fechado_em` em vez de continuar usando `atualizado_em` como proxy?** O `atualizado_em` é atualizado por qualquer mudança no chamado — adicionar observador, editar descrição. Usar `atualizado_em` como data de fechamento produzia datas incorretas quando o chamado era editado após ser fechado. O campo dedicado `fechado_em` é preenchido exatamente no momento da transição para `fechado` e limpo se o status for revertido.
+
+**Por que o helper `_registrar_fechamento` ao invés de sinal Django (`post_save`)?** Sinais de `post_save` executam após o `.save()` e exigiriam um segundo `.save()` para persistir `fechado_em`, ou o uso de `update_fields` em lógica separada. O helper é chamado explicitamente antes do `.save()`, mantendo a operação em uma única gravação. Também é mais legível: fica claro no código da view que `fechado_em` é gerenciado intencionalmente naquele ponto.
+
+**Por que breakpoint `xl` (1280px) e não `lg` (1024px) para o nav?** Com 8 itens admin no navbar mais o logo e os controles do lado direito, a largura mínima necessária ultrapassa 1024px. Calculando: logo (~120px) + 7 links de nav (~70px cada = 490px) + E-mail SMTP (~120px) + espaçamento + controles direitos (~150px) = ~900px+ sem folga. Em `lg` (1024px) ainda haveria risco de overflow com texto variável (nomes de usuário, fontes do sistema). O `xl` (1280px) garante espaço confortável para todos os itens em qualquer configuração típica.
+
+**Por que "Ver Relatórios" como botão pill acima dos cards e não como card de métrica ou link de rodapé?** O botão pill tem hierarquia visual clara (ação secundária, não primária) sem competir com "Novo Chamado" (ação primária). Acima dos cards é o local natural — o usuário vê os contadores e imediatamente tem a opção de aprofundar a análise. Um link de rodapé seria ignorado; um card de métrica confundiria navegação com dado.
