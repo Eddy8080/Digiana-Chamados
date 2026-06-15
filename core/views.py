@@ -3,7 +3,8 @@ import os
 import secrets
 import string
 import uuid
-from datetime import timedelta
+import calendar
+from datetime import datetime, timedelta
 from html import unescape as _unescape
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -84,6 +85,13 @@ def _strip_html(texto):
     if not texto:
         return ''
     return _unescape(strip_tags(texto)).strip()
+
+
+def _registrar_fechamento(chamado, status_anterior=None):
+    if chamado.status == 'fechado' and not chamado.fechado_em:
+        chamado.fechado_em = timezone.now()
+    elif status_anterior == 'fechado' and chamado.status != 'fechado':
+        chamado.fechado_em = None
 
 
 def _build_destinatarios(chamado, extras=None):
@@ -199,10 +207,11 @@ def dashboard(request):
 
     if role == 'usuario':
         chamados = Chamado.objects.filter(
-            Q(criado_por=request.user) | Q(observadores=request.user)
+            Q(criado_por=request.user) | Q(observadores=request.user),
+            excluido=False,
         ).distinct().order_by('-criado_em')
     else:
-        chamados = Chamado.objects.all().order_by('-criado_em')
+        chamados = Chamado.objects.filter(excluido=False).order_by('-criado_em')
 
     total_chamados = chamados.count()
     abertos = chamados.filter(status='aberto').count()
@@ -234,10 +243,11 @@ def dashboard_stats(request):
     role = _role(request.user)
     qs = (
         Chamado.objects.filter(
-            Q(criado_por=request.user) | Q(observadores=request.user)
+            Q(criado_por=request.user) | Q(observadores=request.user),
+            excluido=False,
         ).distinct()
         if role == 'usuario'
-        else Chamado.objects.all()
+        else Chamado.objects.filter(excluido=False)
     )
     return JsonResponse({
         'total':        qs.count(),
@@ -245,6 +255,129 @@ def dashboard_stats(request):
         'em_progresso': qs.filter(status='em_progresso').count(),
         'pendentes':    qs.filter(status='pendente').count(),
         'resolvidos':   qs.filter(status='resolvido').count(),
+    })
+
+
+@login_required(login_url='login')
+def relatorios_view(request):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+
+    hoje = timezone.localdate()
+    modo = request.GET.get('modo', 'mensal')
+    if modo not in ('mensal', 'anual'):
+        modo = 'mensal'
+
+    try:
+        ano = int(request.GET.get('ano', hoje.year))
+    except (TypeError, ValueError):
+        ano = hoje.year
+
+    try:
+        mes = int(request.GET.get('mes', hoje.month))
+    except (TypeError, ValueError):
+        mes = hoje.month
+    mes = min(max(mes, 1), 12)
+
+    anos = range(hoje.year - 4, hoje.year + 1)
+    meses = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+    periodo_fechado = ano < hoje.year or (modo == 'mensal' and ano == hoje.year and mes < hoje.month)
+    if modo == 'anual':
+        inicio = timezone.make_aware(datetime(ano, 1, 1))
+        fim = timezone.make_aware(datetime(ano + 1, 1, 1))
+        periodo_label = str(ano)
+    else:
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        inicio = timezone.make_aware(datetime(ano, mes, 1))
+        fim = timezone.make_aware(datetime(ano, mes, ultimo_dia, 23, 59, 59, 999999)) + timedelta(microseconds=1)
+        periodo_label = f"{dict(meses)[mes]} de {ano}"
+
+    criados_qs = Chamado.objects.filter(criado_em__gte=inicio, criado_em__lt=fim)
+    fechados_qs = Chamado.objects.filter(
+        excluido=False,
+        status='fechado',
+        fechado_em__gte=inicio,
+        fechado_em__lt=fim,
+    )
+    excluidos_qs = Chamado.objects.filter(
+        excluido=True,
+        excluido_em__gte=inicio,
+        excluido_em__lt=fim,
+    )
+    operacionais_qs = Chamado.objects.filter(excluido=False)
+
+    total_criados = criados_qs.count()
+    total_fechados = fechados_qs.count()
+    total_excluidos = excluidos_qs.count()
+    taxa_fechamento = round((total_fechados / total_criados) * 100, 1) if total_criados else 0
+
+    status_operacional = {
+        'abertos': operacionais_qs.filter(status='aberto').count(),
+        'em_progresso': operacionais_qs.filter(status='em_progresso').count(),
+        'pendentes': operacionais_qs.filter(status='pendente').count(),
+        'resolvidos': operacionais_qs.filter(status='resolvido').count(),
+        'fechados': operacionais_qs.filter(status='fechado').count(),
+    }
+    chart_points = []
+    if modo == 'anual':
+        periodos = []
+        for mes_ref in range(1, 13):
+            periodo_inicio = timezone.make_aware(datetime(ano, mes_ref, 1))
+            if mes_ref == 12:
+                periodo_fim = timezone.make_aware(datetime(ano + 1, 1, 1))
+            else:
+                periodo_fim = timezone.make_aware(datetime(ano, mes_ref + 1, 1))
+            periodos.append((dict(meses)[mes_ref][:3], periodo_inicio, periodo_fim))
+    else:
+        periodos = []
+        for dia in range(1, calendar.monthrange(ano, mes)[1] + 1):
+            periodo_inicio = timezone.make_aware(datetime(ano, mes, dia))
+            periodo_fim = periodo_inicio + timedelta(days=1)
+            periodos.append((str(dia), periodo_inicio, periodo_fim))
+
+    max_chart_value = 1
+    for label, periodo_inicio, periodo_fim in periodos:
+        fechados_count = Chamado.objects.filter(
+            excluido=False,
+            status='fechado',
+            fechado_em__gte=periodo_inicio,
+            fechado_em__lt=periodo_fim,
+        ).count()
+        excluidos_count = Chamado.objects.filter(
+            excluido=True,
+            excluido_em__gte=periodo_inicio,
+            excluido_em__lt=periodo_fim,
+        ).count()
+        max_chart_value = max(max_chart_value, fechados_count, excluidos_count)
+        chart_points.append({
+            'label': label,
+            'fechados': fechados_count,
+            'excluidos': excluidos_count,
+        })
+
+    for point in chart_points:
+        point['fechados_pct'] = max(4, round((point['fechados'] / max_chart_value) * 100)) if point['fechados'] else 0
+        point['excluidos_pct'] = max(4, round((point['excluidos'] / max_chart_value) * 100)) if point['excluidos'] else 0
+
+    return render(request, 'core/relatorios.html', {
+        'modo': modo,
+        'ano': ano,
+        'mes': mes,
+        'anos': anos,
+        'meses': meses,
+        'periodo_fechado': periodo_fechado,
+        'periodo_label': periodo_label,
+        'total_criados': total_criados,
+        'total_fechados': total_fechados,
+        'total_excluidos': total_excluidos,
+        'taxa_fechamento': taxa_fechamento,
+        'status_operacional': status_operacional,
+        'chart_points': chart_points,
     })
 
 
@@ -320,7 +453,7 @@ def projetos_list(request):
         messages.error(request, "Acesso negado.")
         return redirect('dashboard')
     qs = Projeto.objects.select_related('cliente').annotate(
-        num_chamados_abertos=Count('chamados', filter=Q(chamados__status='aberto'))
+        num_chamados_abertos=Count('chamados', filter=Q(chamados__status='aberto', chamados__excluido=False))
     ).order_by('cliente__nome', 'nome')
     paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page'))
@@ -454,10 +587,11 @@ def chamados_list(request):
     role = _role(request.user)
     qs = (
         Chamado.objects.filter(
-            Q(criado_por=request.user) | Q(observadores=request.user)
+            Q(criado_por=request.user) | Q(observadores=request.user),
+            excluido=False,
         ).distinct()
         if role == 'usuario'
-        else Chamado.objects.all()
+        else Chamado.objects.filter(excluido=False)
     )
 
     status_f    = request.GET.get('status', '')
@@ -504,6 +638,7 @@ def chamado_create(request):
                 chamado.status = 'aberto'
             elif not _status_permitido(chamado.status, request.user, chamado):
                 chamado.status = 'aberto'
+            _registrar_fechamento(chamado)
             chamado.save()
             form.save_m2m()
             _salvar_anexos(request, chamado)
@@ -547,7 +682,7 @@ def chamado_detail(request, pk):
     chamado = get_object_or_404(
         Chamado.objects.prefetch_related(
             Prefetch('observadores', queryset=User.objects.select_related('perfil'))
-        ),
+        ).filter(excluido=False),
         pk=pk
     )
     role = _role(request.user)
@@ -565,6 +700,7 @@ def chamado_detail(request, pk):
 
     # ── POST: salvar alterações ─────────────────────────────────────────────
     if request.method == 'POST' and can_edit:
+        status_anterior_codigo = chamado.status
         status_anterior      = chamado.get_status_display()
         responsavel_anterior = chamado.responsavel
 
@@ -575,6 +711,7 @@ def chamado_detail(request, pk):
             if not _status_permitido(obj.status, request.user, chamado):
                 obj.status = chamado.status
             chamado = obj
+            _registrar_fechamento(chamado, status_anterior=status_anterior_codigo)
             chamado.save()
             form.save_m2m()
             _salvar_anexos(request, chamado)
@@ -721,7 +858,7 @@ def chamado_detail(request, pk):
 
 @login_required(login_url='login')
 def chamado_update(request, pk):
-    chamado = get_object_or_404(Chamado, pk=pk)
+    chamado = get_object_or_404(Chamado, pk=pk, excluido=False)
     role = _role(request.user)
 
     is_responsavel = chamado.responsavel_id == request.user.pk
@@ -730,6 +867,7 @@ def chamado_update(request, pk):
         messages.error(request, "Acesso negado.")
         return redirect('chamado_detail', pk=pk)
 
+    status_anterior_codigo = chamado.status
     status_anterior      = chamado.get_status_display()
     responsavel_anterior = chamado.responsavel
 
@@ -741,6 +879,7 @@ def chamado_update(request, pk):
             if not _status_permitido(obj.status, request.user, chamado):
                 obj.status = chamado.status
             chamado = obj
+            _registrar_fechamento(chamado, status_anterior=status_anterior_codigo)
             chamado.save()
             form.save_m2m()
             _salvar_anexos(request, chamado)
@@ -914,7 +1053,7 @@ def _status_permitido(status_novo, user, chamado=None):
 
 @login_required(login_url='login')
 def chamado_responder(request, pk):
-    chamado = get_object_or_404(Chamado, pk=pk)
+    chamado = get_object_or_404(Chamado, pk=pk, excluido=False)
     role = _role(request.user)
     is_observador = chamado.observadores.filter(pk=request.user.pk).exists()
 
@@ -983,7 +1122,7 @@ def chamado_responder(request, pk):
 
 @login_required(login_url='login')
 def chamado_reopen(request, pk):
-    chamado = get_object_or_404(Chamado, pk=pk)
+    chamado = get_object_or_404(Chamado, pk=pk, excluido=False)
     role = _role(request.user)
 
     if role == 'usuario' and chamado.criado_por != request.user:
@@ -991,7 +1130,9 @@ def chamado_reopen(request, pk):
         return redirect('dashboard')
 
     if request.method == 'POST' and chamado.status in ('resolvido', 'fechado'):
+        status_anterior = chamado.status
         chamado.status = 'aberto'
+        _registrar_fechamento(chamado, status_anterior=status_anterior)
         chamado.save()
 
         destinatarios = _build_destinatarios(chamado)
@@ -1032,13 +1173,15 @@ def chamado_delete(request, pk):
         return redirect('chamado_detail', pk=pk)
     if request.method != 'POST':
         return redirect('chamado_detail', pk=pk)
+    if chamado.excluido:
+        messages.info(request, "Este chamado já foi excluído.")
+        return redirect('dashboard')
 
     motivo = request.POST.get('motivo', '').strip()
     if not motivo:
         messages.error(request, "Informe o motivo da exclusão.")
         return redirect('chamado_detail', pk=pk)
 
-    # Coleta dados antes de deletar — após delete o objeto não existe mais
     chamado_id       = chamado.id
     titulo           = chamado.titulo
     projeto_nome     = chamado.projeto.nome
@@ -1050,7 +1193,11 @@ def chamado_delete(request, pk):
     excluido_por  = request.user.get_full_name() or request.user.username
     destinatarios = _build_destinatarios(chamado)
 
-    chamado.delete()
+    chamado.excluido = True
+    chamado.excluido_em = timezone.now()
+    chamado.excluido_por = request.user
+    chamado.motivo_exclusao = motivo
+    chamado.save(update_fields=['excluido', 'excluido_em', 'excluido_por', 'motivo_exclusao', 'atualizado_em'])
 
     if destinatarios:
         ok_del, erro_del = disparar_email(

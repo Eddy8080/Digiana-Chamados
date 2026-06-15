@@ -11,6 +11,7 @@ urlpatterns = [
     path('usuarios/<int:pk>/excluir/', views.usuario_delete, name='usuario_delete'),
     path('usuarios/<int:pk>/resetar-senha/', views.usuario_reset_senha, name='usuario_reset_senha'),
     path('alterar-senha/', views.alterar_senha_view, name='alterar_senha'),
+    path('relatorios/', views.relatorios_view, name='relatorios'),
 
     # Dashboard e Páginas principais
     path('', views.dashboard, name='dashboard'),

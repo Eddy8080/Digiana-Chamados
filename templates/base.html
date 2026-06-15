@@ -330,6 +330,10 @@
                         {% endif %}
 
                         {% if user_role == 'admin' %}
+                        <a href="{% url 'relatorios' %}"
+                           class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
+                                  {% if url_name == 'relatorios' %}bg-slate-700 text-white border-cyan-500/60{% else %}text-slate-300 hover:text-white hover:bg-slate-800 border-cyan-500/30 hover:border-cyan-500/60{% endif %}">Relatórios</a>
+
                         <a href="{% url 'sistemas_list' %}"
                            class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
                                   {% if url_name == 'sistemas_list' or url_name == 'sistema_create' or url_name == 'sistema_update' %}bg-slate-700 text-white border-emerald-500/60{% else %}text-slate-300 hover:text-white hover:bg-slate-800 border-emerald-500/30 hover:border-emerald-500/60{% endif %}">Sistemas</a>
@@ -423,6 +427,12 @@
                 <a href="{% url 'projetos_list' %}"
                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition
                           {% if url_name == 'projetos_list' or url_name == 'projeto_create' or url_name == 'projeto_update' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Projetos</a>
+                {% endif %}
+
+                {% if user_role == 'admin' %}
+                <a href="{% url 'relatorios' %}"
+                   class="block px-3 py-2.5 rounded-md text-sm font-medium transition
+                          {% if url_name == 'relatorios' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Relatórios</a>
                 {% endif %}
             </nav>
             {% endwith %}
