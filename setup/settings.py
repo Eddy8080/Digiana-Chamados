@@ -46,6 +46,8 @@ if _on_railway:
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
+CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+
 
 # Application definition
 

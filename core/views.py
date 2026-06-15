@@ -125,6 +125,11 @@ def _build_link(request, path):
     return request.build_absolute_uri(path)
 
 
+def csrf_failure(request, reason=""):
+    messages.error(request, "Sessão expirada ou token inválido. Recarregue e tente novamente.")
+    return redirect('login')
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
