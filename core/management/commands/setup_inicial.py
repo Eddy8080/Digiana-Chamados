@@ -1,7 +1,8 @@
 import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from django.db import connection
+from django.db import connection, transaction
+from core.models import PerfilUsuario
 
 
 class Command(BaseCommand):
@@ -35,5 +36,12 @@ class Command(BaseCommand):
             )
             return
 
-        User.objects.create_superuser(username=username, email=email, password=password)
+        with transaction.atomic():
+            user = User.objects.create_superuser(username=username, email=email, password=password)
+            PerfilUsuario.objects.create(
+                user=user,
+                role='diretor_ti',
+                must_change_password=False,
+            )
+
         self.stdout.write(f'Superusuário "{username}" criado com sucesso.')
