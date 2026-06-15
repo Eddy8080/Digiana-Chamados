@@ -1,1 +1,1 @@
-web: mkdir -p static staticfiles media && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py shell -c "from django.contrib.auth.models import User; User.objects.exists() or __import__('os').system('python manage.py loaddata fixtures_inicial.json')" && gunicorn setup.wsgi --bind 0.0.0.0:$PORT --timeout 120 --workers 2
+web: mkdir -p staticfiles media && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py setup_inicial && gunicorn setup.wsgi --bind 0.0.0.0:$PORT --timeout 120 --workers 2
