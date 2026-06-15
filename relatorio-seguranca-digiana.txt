@@ -1,0 +1,117 @@
+╔══════════════════════════════════════════════════════════════════╗
+║     RELATÓRIO DE SEGURANÇA — DIGIANA CHAMADOS                   ║
+║     URL: https://digiana-chamados-production.up.railway.app/    ║
+║     Data: 15/06/2026                                            ║
+╚══════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════
+1. PONTOS FORTES (OK)
+═══════════════════════════════════════════════════════════════════
+
+  [ok] CSRF Protection        — csrfmiddlewaretoken + SameSite=Lax
+  [ok] X-Frame-Options        — DENY (anti-clickjacking)
+  [ok] X-Content-Type-Options — nosniff (anti-MIME sniffing)
+  [ok] Referrer-Policy        — same-origin
+  [ok] Brute Force Protection — 403 após múltiplas tentativas
+  [ok] .env / .git expostos   — Não encontrado
+  [ok] Listagem de diretórios — Desativada
+  [ok] Open Redirect          — Bloqueado
+  [ok] SQL Injection          — Bloqueado
+  [ok] Vazamento tracebacks   — Nenhum erro exposto
+  [ok] Cache páginas admin    — no-cache, no-store, private
+
+═══════════════════════════════════════════════════════════════════
+2. VULNERABILIDADES ENCONTRADAS
+═══════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Alta Severidade                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+1. HSTS AUSENTE
+   Risco: Conexões HTTP podem ser interceptadas (man-in-the-middle)
+   Correção: Adicionar no settings.py do Django:
+     SECURE_HSTS_SECONDS = 31536000
+     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+     SECURE_SSL_REDIRECT = True
+
+2. CSP AUSENTE (Content Security Policy)
+   Risco: Se houver brecha XSS, atacante pode executar scripts arbitrários
+   Correção: Adicionar no settings.py:
+     CSP_DEFAULT_SRC = ("'self'",)
+     CSP_SCRIPT_SRC = ("'self'", "cdn.tailwindcss.com")
+     CSP_STYLE_SRC = ("'self'", "fonts.googleapis.com")
+     CSP_FONT_SRC = ("'self'", "fonts.gstatic.com")
+     (Requer pacote django-csp)
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Média Severidade                                                │
+└─────────────────────────────────────────────────────────────────┘
+
+3. DJANGO ADMIN EXPOSTO (/admin/)
+   Risco: Superfície de ataque conhecida para brute force
+   Correção: Mudar a URL padrão ou restringir por IP:
+     urlpatterns = [ path("painel-seguro/", admin.site.urls) ]
+   - Ou usar django-admin-honeypot para simular admin falso
+   - Ou configurar nginx para bloquear /admin/ por IP
+
+4. TAILWIND CSS VIA CDN SEM SRI
+   Risco: Se o CDN for comprometido, scripts maliciosos podem rodar
+   Correção: Adicionar integrity hash no script:
+     <script src="https://cdn.tailwindcss.com"
+             integrity="sha256-..." crossorigin="anonymous"></script>
+   (Gerar hash em https://www.srihash.org)
+
+5. GOOGLE FONTS VIA CDN SEM SRI
+   Risco: Mesmo que acima — comprometimento do CDN
+   Correção: Self-host as fonts ou adicionar SRI
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Baixa Severidade                                                │
+└─────────────────────────────────────────────────────────────────┘
+
+6. CAMPO SENHA SEM AUTOCOMPLETE=OFF
+   Risco: Vazamento de senha em computadores compartilhados
+   Correção: Adicionar autocomplete="off" no template do login
+
+7. PERMISSIONS-POLICY AUSENTE
+   Risco: Navegador pode permitir acesso a câmera/mic sem necessidade
+   Correção: Adicionar no settings.py:
+     SECURE_PERMISSIONS_POLICY = \
+       "camera=(), microphone=(), geolocation=()"
+
+8. X-XSS-PROTECTION AUSENTE
+   Risco: Baixo (navegadores modernos ignoram), mas é boa prática
+   Correção: SECURE_BROWSER_XSS_FILTER = True
+
+═══════════════════════════════════════════════════════════════════
+3. NOTAS IMPORTANTES
+═══════════════════════════════════════════════════════════════════
+
+  - O csrftoken não tem HttpOnly nem Secure (comportamento normal
+    do Django para CSRF). Verificar se o sessionid tem essas flags.
+  - Railway (host) adiciona proxy próprio — confirmar se HSTS não
+    conflita com o proxy.
+  - Teste de força bruta retornou 403 consistente — bom sinal.
+  - Nenhuma rota sensível como /backup, /dump, /console foi
+    encontrada.
+  - O formulário de login utiliza CSRF corretamente.
+
+═══════════════════════════════════════════════════════════════════
+4. PRIORIDADE DE CORREÇÃO
+═══════════════════════════════════════════════════════════════════
+
+  Prioridade 1 (Corrigir imediatamente):
+    → HSTS (Strict-Transport-Security)
+
+  Prioridade 2 (Corrigir o quanto antes):
+    → CSP (Content-Security-Policy)
+    → Esconder /admin/
+
+  Prioridade 3 (Corrigir quando possível):
+    → SRI nos CDNs (TailwindCSS + Google Fonts)
+    → autocomplete="off" na senha
+    → Permissions-Policy + X-XSS-Protection
+
+═══════════════════════════════════════════════════════════════════
+Fim do relatório.
