@@ -2850,22 +2850,56 @@ O Railway também injeta automaticamente `RAILWAY_PUBLIC_DOMAIN`, `RAILWAY_ENVIR
 2. Fallback: constrói URL a partir de `PGHOST` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGPORT` (injetados automaticamente)
 3. Fallback final: SQLite local (apenas desenvolvimento)
 
-### Dados iniciais — `fixtures_inicial.json`
+### Dados de desenvolvimento — `fixtures_inicial.json`
 
-Arquivo na raiz do projeto com 14 registros exportados do SQLite local:
+Arquivo na raiz do projeto com registros exportados do SQLite local:
 - `auth.user` — admin, Edilsonmn
 - `core.perfilusuario` — perfis dos dois usuários
 - `core.sistema`, `core.cliente`, `core.projeto`
 - `core.chamado`, `core.resposta`, `core.anexo`
-- `core.configuraremail`
+- `core.configuraremail` — exemplo inativo, sem senha/token real
 
-O Procfile carrega o fixture automaticamente no startup **se o banco estiver vazio** (sem usuários), evitando perda de acesso após redeploys.
+O fixture não deve conter `sessions.session`, senhas SMTP, tokens de API ou credenciais reais.
+
+Este arquivo é apenas para recriar ambiente de desenvolvimento local. Ele não deve ser executado automaticamente em produção, pois contém PKs fixas, dados transacionais e configuração sensível. Em produção, o acesso inicial é garantido pelo comando idempotente `setup_inicial`, que cria o superusuário inicial e seu `PerfilUsuario` como `diretor_ti` apenas quando o banco está vazio.
+
+### Setup local de desenvolvimento
+
+O ambiente local deve ser preparado com:
+
+```
+python manage.py setup_dev
+```
+
+O comando `setup_dev`:
+- recusa execução no Railway;
+- recusa execução fora de SQLite local;
+- aplica migrations;
+- carrega `fixtures_inicial.json` apenas se o banco local estiver vazio;
+- não executa `loaddata` quando já existem usuários, preservando perfis, chamados e alterações locais.
+
+### Seed idempotente de cadastros base
+
+Cadastros base podem ser criados manualmente com:
+
+```
+python manage.py seed_base
+```
+
+O comando `seed_base` não faz parte do deploy e não toca em chamados, respostas, anexos, perfis ou configurações de e-mail. Ele usa `get_or_create` para criar apenas registros ausentes:
+- `Sistema` por `nome`;
+- `Cliente` por `cpf_cnpj` ou `email`;
+- `Projeto` por `cliente + nome`.
+
+Registros já existentes não são atualizados nem sobrescritos.
 
 ### Procfile
 
 ```
-web: mkdir -p static staticfiles && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py shell -c "from django.contrib.auth.models import User; User.objects.exists() or __import__('os').system('python manage.py loaddata fixtures_inicial.json')" && gunicorn setup.wsgi --bind 0.0.0.0:$PORT
+web: mkdir -p staticfiles media && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py setup_inicial && gunicorn setup.wsgi --bind 0.0.0.0:$PORT --timeout 120 --workers 2
 ```
+
+Antes de cada deploy, conferir `CHECKLIST_RAILWAY.md`.
 
 ### Problemas resolvidos durante o deploy
 
@@ -2875,7 +2909,7 @@ web: mkdir -p static staticfiles && python manage.py collectstatic --noinput && 
 | Attestation failure do mise | mise v2026 exige attestations para versões patch exatas | Usar versão minor `3.11` sem patch |
 | `dj-database-url` conflito | versão 2.x e 3.x exigem Django ≥ 4.2 | Remover lib; parsear `DATABASE_URL` com `urllib.parse` nativo |
 | `ALLOWED_HOSTS` ignorado | Variáveis manuais não estavam sendo aplicadas | Usar `RAILWAY_PUBLIC_DOMAIN` injetado automaticamente |
-| Dados perdidos a cada redeploy | `DATABASE_URL` não resolvido → SQLite apagado no container | Fallback `PGHOST`/`PGUSER` + auto-loaddata no Procfile |
+| Dados perdidos a cada redeploy | `DATABASE_URL` não resolvido → SQLite apagado no container | Fallback `PGHOST`/`PGUSER` + bloqueio de Railway com SQLite no `setup_inicial` |
 | Worker timeout ao testar e-mail | Conexão SMTP travada (sem timeout) derrubava o Gunicorn | `timeout=15` no `get_connection()` |
 
 ---
@@ -2922,7 +2956,7 @@ O **Zoho ZeptoMail** é o produto da própria Zoho criado especificamente para e
 2. Adicionar e verificar o domínio `anagma.com.br`
 3. Gerar o token SMTP
 4. Atualizar a configuração SMTP no sistema: servidor `smtp.zeptomail.com`, porta `587`, TLS habilitado, usuário e senha gerados pelo ZeptoMail
-5. Atualizar `fixtures_inicial.json` com a nova configuração
+5. Cadastrar a nova configuração no painel do sistema ou por comando idempotente, sem armazenar senha/token em fixture
 
 **Alternativa:** Brevo (antigo Sendinblue) — 300 e-mails/dia grátis, SMTP `smtp-relay.brevo.com:587`, funciona em cloud sem restrição.
 

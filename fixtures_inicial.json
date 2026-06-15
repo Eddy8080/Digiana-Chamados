@@ -34,30 +34,6 @@
   }
 },
 {
-  "model": "sessions.session",
-  "pk": "ej9kau699thn1efqe1k9x2nt83ivd7t8",
-  "fields": {
-    "session_data": ".eJxVjDsOwyAQBe9CHSH-XqdM7zMgYJfgJALJ2FWUu0dILpL2zcx7Mx-Ovfij0-ZXZFcm2eV3iyE9qQ6Aj1DvjadW922NfCj8pJ0vDel1O92_gxJ6GbXDlBAAYtY0G6OykMra7CwpG3KAKBSSnixqBAeGhJgJpFNJWBP1xD5f8yY3rQ:1wWfdw:oYxaXVjR1rXw2S7e0QyACPGC89We7AhWqKu3Su8gHYw",
-    "expire_date": "2026-06-22T19:28:16.623Z"
-  }
-},
-{
-  "model": "sessions.session",
-  "pk": "kbsrhrm9a20ke1o3ew3308ypthb5f3hg",
-  "fields": {
-    "session_data": ".eJxVjMsOwiAQRf-FtSFMoTxcuvcbyDBDpWogKe3K-O_apAvd3nPOfYmI21ri1vMSZxZnAeL0uyWkR6474DvWW5PU6rrMSe6KPGiX18b5eTncv4OCvXxr9MZZNN4ZRB4CowZtrbeK1aSnURF5AusgBM7egFLIDtKowISBrCbx_gDLYzcJ:1wXKG4:UcKr929yayXO8k8UHuby0U0LxagqknIkuL-yOL5R4EQ",
-    "expire_date": "2026-06-24T14:50:20.585Z"
-  }
-},
-{
-  "model": "sessions.session",
-  "pk": "m8y0wemdp4fw73hkjce9sepkz29d8i2c",
-  "fields": {
-    "session_data": ".eJxVjMsOwiAQRf-FtSFMoTxcuvcbyDBDpWogKe3K-O_apAvd3nPOfYmI21ri1vMSZxZnAeL0uyWkR6474DvWW5PU6rrMSe6KPGiX18b5eTncv4OCvXxr9MZZNN4ZRB4CowZtrbeK1aSnURF5AusgBM7egFLIDtKowISBrCbx_gDLYzcJ:1wXKFP:iH0nFrMhStXwQQuZ5ohiD1Ld0xTueOTs1d0XiQNZ4vo",
-    "expire_date": "2026-06-24T14:49:39.045Z"
-  }
-},
-{
   "model": "core.sistema",
   "pk": 1,
   "fields": {
@@ -147,12 +123,16 @@
   "model": "core.configuraremail",
   "pk": 1,
   "fields": {
-    "servidor_smtp": "smtp.zoho.com",
-    "porta": 465,
-    "usuario": "edilson.monteiro@anagma.com.br",
-    "senha": "Linux@44",
-    "use_tls": false,
-    "use_ssl": true,
+    "nome": "Exemplo Desenvolvimento",
+    "ativo": false,
+    "servidor_smtp": "smtp.example.com",
+    "porta": 587,
+    "usuario": "dev@example.com",
+    "remetente": "noreply@example.com",
+    "senha": null,
+    "use_tls": true,
+    "use_ssl": false,
+    "usar_api": false,
     "atualizado_em": "2026-06-10T14:48:07.763Z"
   }
 },
