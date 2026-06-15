@@ -310,7 +310,7 @@
                     </a>
                     {% if user.is_authenticated %}
                     {% with url_name=request.resolver_match.url_name %}
-                    <nav class="hidden md:flex items-center space-x-0.5 ml-4">
+                    <nav class="hidden xl:flex items-center space-x-0.5 ml-4">
                         <a href="{% url 'dashboard' %}"
                            class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap
                                   {% if url_name == 'dashboard' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Dashboard</a>
@@ -354,7 +354,7 @@
                     {% if user.is_authenticated %}
                     <!-- Hambúrguer — navegação mobile (oculto em md+) -->
                     <button id="btn-hamburger" type="button" title="Menu"
-                            class="md:hidden p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition">
+                            class="xl:hidden p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition">
                         <svg id="icon-hamburger-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
                         </svg>
@@ -410,7 +410,7 @@
             {% if user.is_authenticated %}
             {% with url_name=request.resolver_match.url_name %}
             <!-- Menu mobile (drawer) — oculto em md+ -->
-            <nav id="mobile-menu" class="md:hidden hidden flex-col gap-1 pb-4 pt-2 border-t border-slate-800">
+            <nav id="mobile-menu" class="xl:hidden hidden flex-col gap-1 pb-4 pt-2 border-t border-slate-800">
                 <a href="{% url 'dashboard' %}"
                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition
                           {% if url_name == 'dashboard' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Dashboard</a>
@@ -433,6 +433,15 @@
                 <a href="{% url 'relatorios' %}"
                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition
                           {% if url_name == 'relatorios' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Relatórios</a>
+                <a href="{% url 'sistemas_list' %}"
+                   class="block px-3 py-2.5 rounded-md text-sm font-medium transition
+                          {% if url_name == 'sistemas_list' or url_name == 'sistema_create' or url_name == 'sistema_update' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Sistemas</a>
+                <a href="{% url 'usuarios_list' %}"
+                   class="block px-3 py-2.5 rounded-md text-sm font-medium transition
+                          {% if url_name == 'usuarios_list' or url_name == 'usuario_edit' or url_name == 'cadastro' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Usuários</a>
+                <a href="{% url 'configurar_email' %}"
+                   class="block px-3 py-2.5 rounded-md text-sm font-medium transition
+                          {% if url_name == 'configurar_email' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">⚙ E-mail SMTP</a>
                 {% endif %}
             </nav>
             {% endwith %}
