@@ -399,7 +399,6 @@
                         <input type="file" id="nav-foto-input" accept="image/*" class="sr-only">
 
                         <div class="flex items-center space-x-2">
-                            <span class="hidden xl:inline text-sm text-slate-400">Olá, <strong class="text-slate-200">{{ user.get_full_name|default:user.username }}</strong></span>
                             <a href="{% url 'alterar_senha' %}" class="px-2.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Alterar Senha">🔑 Senha</a>
                         </div>
                         <a href="{% url 'logout' %}" class="px-3 py-2 rounded-md text-sm font-medium bg-red-600/80 hover:bg-red-600 text-white transition">Sair</a>
