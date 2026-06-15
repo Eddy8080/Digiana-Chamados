@@ -330,10 +330,6 @@
                         {% endif %}
 
                         {% if user_role == 'admin' %}
-                        <a href="{% url 'relatorios' %}"
-                           class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
-                                  {% if url_name == 'relatorios' %}bg-slate-700 text-white border-cyan-500/60{% else %}text-slate-300 hover:text-white hover:bg-slate-800 border-cyan-500/30 hover:border-cyan-500/60{% endif %}">Relatórios</a>
-
                         <a href="{% url 'sistemas_list' %}"
                            class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
                                   {% if url_name == 'sistemas_list' or url_name == 'sistema_create' or url_name == 'sistema_update' %}bg-slate-700 text-white border-emerald-500/60{% else %}text-slate-300 hover:text-white hover:bg-slate-800 border-emerald-500/30 hover:border-emerald-500/60{% endif %}">Sistemas</a>
@@ -399,6 +395,7 @@
                         <input type="file" id="nav-foto-input" accept="image/*" class="sr-only">
 
                         <div class="flex items-center space-x-2">
+                            <span class="hidden xl:inline text-sm text-slate-400">Olá, <strong class="text-slate-200">{{ user.get_full_name|default:user.username }}</strong></span>
                             <a href="{% url 'alterar_senha' %}" class="px-2.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Alterar Senha">🔑 Senha</a>
                         </div>
                         <a href="{% url 'logout' %}" class="px-3 py-2 rounded-md text-sm font-medium bg-red-600/80 hover:bg-red-600 text-white transition">Sair</a>
@@ -429,9 +426,6 @@
                 {% endif %}
 
                 {% if user_role == 'admin' %}
-                <a href="{% url 'relatorios' %}"
-                   class="block px-3 py-2.5 rounded-md text-sm font-medium transition
-                          {% if url_name == 'relatorios' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Relatórios</a>
                 <a href="{% url 'sistemas_list' %}"
                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition
                           {% if url_name == 'sistemas_list' or url_name == 'sistema_create' or url_name == 'sistema_update' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">Sistemas</a>
