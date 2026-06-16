@@ -7,22 +7,26 @@
 
 {% block extra_head %}
 <style>
+    /* Trava o layout em 100vh — sem barras de rolagem, footer visível */
+    html, body { height: 100vh !important; overflow: hidden !important; }
+
     .login-main {
         padding-top: 0 !important;
         padding-bottom: 0 !important;
+        min-height: 0 !important;   /* permite flex-grow encolher corretamente */
     }
 
     .login-shell {
-        --login-available-height: calc(100vh - 8.75rem);
+        /* header: 4rem | footer: py-6 (3rem) + 2 linhas texto ≈ 2.75rem = 5.75rem */
+        --login-available-height: calc(100vh - 4rem - 5.75rem);
         --login-banner-width: min(42vw, 520px);
         margin-left: calc(50% - 50vw);
         margin-right: calc(50% - 50vw);
         width: 100vw;
-        overflow-x: hidden;
     }
 
     .login-banner-panel {
-        bottom: 4.25rem;
+        bottom: 5.75rem;  /* alinha com o topo do footer */
         height: auto;
         position: fixed;
         right: 0;
