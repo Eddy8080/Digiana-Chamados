@@ -12,6 +12,7 @@ urlpatterns = [
     path('usuarios/<int:pk>/resetar-senha/', views.usuario_reset_senha, name='usuario_reset_senha'),
     path('alterar-senha/', views.alterar_senha_view, name='alterar_senha'),
     path('relatorios/', views.relatorios_view, name='relatorios'),
+    path('relatorios/exportar-csv/', views.relatorios_export_csv, name='relatorios_export_csv'),
 
     # Dashboard e Páginas principais
     path('', views.dashboard, name='dashboard'),
@@ -53,6 +54,12 @@ urlpatterns = [
 
     # Foto de perfil (qualquer usuário autenticado)
     path('perfil/foto/', views.perfil_foto_view, name='perfil_foto'),
+
+    # SLAs
+    path('slas/', views.sla_list, name='sla_list'),
+    path('slas/novo/', views.sla_create, name='sla_create'),
+    path('slas/<int:pk>/editar/', views.sla_update, name='sla_update'),
+    path('slas/<int:pk>/excluir/', views.sla_delete, name='sla_delete'),
 
     # Upload de imagens (CKEditor)
     path('upload/imagem/', views.upload_imagem_view, name='upload_imagem'),

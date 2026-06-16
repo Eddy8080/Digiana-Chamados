@@ -543,6 +543,24 @@
             <h2 class="text-md font-bold text-slate-800 border-b border-slate-100 pb-2">Status & Atribuição</h2>
             <div class="space-y-4 text-sm">
 
+                {% with sla_status=sla_info %}
+                {% if sla_status %}
+                <div>
+                    <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">SLA</span>
+                    <div class="flex flex-col gap-1">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold {{ sla_status.cor_classe }}">
+                            {{ sla_status.icone }} {{ sla_status.rotulo }}
+                        </span>
+                        {% if sla_status.limite > 0 %}
+                        <span class="text-xs text-slate-400">
+                            {{ sla_status.horas_gastas|floatformat:1 }}h / {{ sla_status.limite|floatformat:0 }}h úteis
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
                 <div>
                     <span class="block text-xs text-slate-400 font-semibold uppercase mb-1">Status</span>
                     {% if can_edit and form.fields.status %}

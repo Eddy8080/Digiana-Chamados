@@ -341,6 +341,7 @@
                         <a href="{% url 'configurar_email' %}"
                            class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
                                   {% if url_name == 'configurar_email' %}bg-slate-700 text-white border-amber-500/60{% else %}text-slate-300 hover:text-white hover:bg-slate-800 border-amber-500/30 hover:border-amber-500/60{% endif %}">⚙ E-mail SMTP</a>
+
                         {% endif %}
                     </nav>
                     {% endwith %}
@@ -435,6 +436,7 @@
                 <a href="{% url 'configurar_email' %}"
                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition
                           {% if url_name == 'configurar_email' %}bg-slate-700 text-white{% else %}text-slate-300 hover:text-white hover:bg-slate-800{% endif %}">⚙ E-mail SMTP</a>
+
                 {% endif %}
             </nav>
             {% endwith %}

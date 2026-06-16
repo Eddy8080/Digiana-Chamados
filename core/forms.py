@@ -2,7 +2,7 @@ import re
 
 from django import forms
 from django.contrib.auth.models import User
-from .models import Cliente, Projeto, Chamado, ConfigurarEmail, PerfilUsuario, Sistema
+from .models import Cliente, Projeto, Chamado, ConfigurarEmail, PerfilUsuario, Sistema, SLADefinicao
 
 _REG = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition'
 
@@ -297,6 +297,34 @@ class SistemaForm(forms.ModelForm):
         }
 
 _INPUT = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition'
+
+_W_SLA = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition'
+
+
+class SLAForm(forms.ModelForm):
+    class Meta:
+        model = SLADefinicao
+        fields = ['nome', 'descricao', 'prioridade', 'tempo_limite_horas', 'cor_classe', 'ativo']
+        labels = {
+            'nome': 'Nome do SLA',
+            'descricao': 'Descrição',
+            'prioridade': 'Prioridade',
+            'tempo_limite_horas': 'Tempo limite (horas úteis)',
+            'cor_classe': 'Classe CSS do badge',
+            'ativo': 'Ativo',
+        }
+        help_texts = {
+            'cor_classe': 'Ex: bg-emerald-100 text-emerald-800, bg-amber-100 text-amber-800, bg-rose-100 text-rose-800',
+        }
+        widgets = {
+            'nome': forms.TextInput(attrs={'class': _W_SLA, 'placeholder': 'Ex: SLA Premium'}),
+            'descricao': forms.Textarea(attrs={'class': _W_SLA, 'rows': 3, 'placeholder': 'Descrição opcional…'}),
+            'prioridade': forms.Select(attrs={'class': _W_SLA}),
+            'tempo_limite_horas': forms.NumberInput(attrs={'class': _W_SLA, 'step': '0.5', 'placeholder': 'Ex: 40'}),
+            'cor_classe': forms.TextInput(attrs={'class': _W_SLA, 'placeholder': 'bg-emerald-100 text-emerald-800'}),
+            'ativo': forms.CheckboxInput(attrs={'class': 'w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500'}),
+        }
+
 
 class ConfigurarEmailForm(forms.ModelForm):
     senha = forms.CharField(

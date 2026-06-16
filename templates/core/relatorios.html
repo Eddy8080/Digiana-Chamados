@@ -42,6 +42,13 @@
             <button type="submit" class="inline-flex items-center justify-center px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl shadow-lg transition">
                 Gerar Prévia
             </button>
+            <a href="{% url 'relatorios_export_csv' %}?modo={{ modo }}&ano={{ ano }}&mes={{ mes }}"
+               class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Exportar CSV
+            </a>
         </div>
     </form>
 
@@ -62,7 +69,7 @@
         </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <div class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
             <p class="text-sm font-semibold text-slate-500">Chamados criados</p>
             <p class="text-3xl font-extrabold text-slate-900 mt-2">{{ total_criados }}</p>
@@ -72,10 +79,209 @@
             <p class="text-3xl font-extrabold text-slate-900 mt-2">{{ taxa_fechamento }}%</p>
         </div>
         <div class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+            <p class="text-sm font-semibold text-slate-500">Reincidência</p>
+            <p class="text-3xl font-extrabold text-slate-900 mt-2">{{ taxa_reincidencia }}%</p>
+            <p class="text-xs text-slate-400 mt-1">{{ total_reabertos }} chamado{{ total_reabertos|pluralize:"s" }} reaberto{{ total_reabertos|pluralize:"s" }}</p>
+        </div>
+        <div class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
             <p class="text-sm font-semibold text-slate-500">Backlog operacional</p>
             <p class="text-3xl font-extrabold text-slate-900 mt-2">{{ status_operacional.abertos|add:status_operacional.em_progresso|add:status_operacional.pendentes }}</p>
         </div>
+        <div class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+            <p class="text-sm font-semibold text-slate-500">SLA Compliance</p>
+            {% if sla_compliance is not None %}
+            <p class="text-3xl font-extrabold mt-2 {% if sla_compliance >= 90 %}text-emerald-600{% elif sla_compliance >= 70 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                {{ sla_compliance }}%
+            </p>
+            <p class="text-xs text-slate-400 mt-1">{{ sla_dentro }} dentro / {{ sla_violados }} violado{{ sla_violados|pluralize:"s" }}</p>
+            {% else %}
+            <p class="text-sm text-slate-400 italic mt-2">Sem SLAs definidos</p>
+            {% endif %}
+        </div>
     </div>
+
+    <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900">Tempo Médio de Resolução (MTTR)</h2>
+            {% if mttr_count > 0 %}
+            <span class="text-xs font-semibold {{ mttr_badge }} px-2.5 py-1 rounded-full">{{ mttr_count }} chamados</span>
+            {% endif %}
+        </div>
+        <p class="text-sm text-slate-500 mb-4">Média de horas úteis (seg–sex 08h–18h) entre abertura e fechamento.</p>
+
+        {% if mttr_count > 0 %}
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="{{ mttr_bg }} rounded-xl p-5 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Média</p>
+                <p class="text-3xl font-extrabold {{ mttr_cor }} mt-1">{{ mttr_label }}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-5 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Mínimo</p>
+                <p class="text-2xl font-bold text-slate-700 mt-1">{{ mttr_min_label }}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-5 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Máximo</p>
+                <p class="text-2xl font-bold text-slate-700 mt-1">{{ mttr_max_label }}</p>
+            </div>
+        </div>
+
+        <div class="mt-4 w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            {% if mttr_count > 0 %}
+            <div class="h-full rounded-full transition-all duration-500 {{ mttr_barra }}"
+                 style="width: {{ mttr_pct }}%;"></div>
+            {% endif %}
+        </div>
+
+        <div class="flex justify-between text-xs text-slate-400 mt-1.5">
+            <span>< 10h</span>
+            <span>10–30h</span>
+            <span>30–70h</span>
+            <span>> 70h</span>
+        </div>
+        {% else %}
+        <div class="rounded-xl bg-slate-50 p-8 text-center">
+            <p class="text-slate-400 italic">Nenhum chamado fechado neste período para calcular o MTTR.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900">Distribuição por Prioridade</h2>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">Chamados criados no período, segmentados por prioridade e status atual.</p>
+        <div class="grid gap-4 sm:grid-cols-3">
+            {% for item in prioridade_distribuicao %}
+            <div class="{{ item.cor.bg }} rounded-xl p-4 border border-slate-100">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold {{ item.cor.text }}">{{ item.rotulo }}</span>
+                    <span class="text-xs font-semibold {{ item.cor.badge }} px-2 py-0.5 rounded-full">{{ item.total }}</span>
+                </div>
+                {% if item.status_breakdown %}
+                <div class="space-y-1.5">
+                    {% for status in item.status_breakdown %}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-500">{{ status.rotulo }}</span>
+                        <span class="font-semibold text-slate-700">{{ status.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3 w-full bg-slate-200/60 rounded-full h-2 overflow-hidden">
+                    <div class="h-full rounded-full {{ item.cor.barra }}" style="width: {{ item.pct }}%;"></div>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-400 italic">Nenhum chamado</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="grid gap-4 md:grid-cols-2">
+        <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+            <h2 class="text-lg font-bold text-slate-900">Top Sistemas</h2>
+            <p class="text-sm text-slate-500 mb-3">Sistemas com mais chamados criados no período.</p>
+            {% if sist_lista %}
+            <div class="space-y-3">
+                {% for s in sist_lista %}
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-1">
+                        <span class="font-semibold text-slate-700 truncate max-w-[200px]">{{ s.nome }}</span>
+                        <span class="font-bold text-slate-800 ml-2">{{ s.total }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="h-full rounded-full bg-indigo-500" style="width: {{ s.pct }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="rounded-xl bg-slate-50 p-8 text-center">
+                <p class="text-slate-400 italic">Nenhum sistema com chamados no período.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+            <h2 class="text-lg font-bold text-slate-900">Top Clientes</h2>
+            <p class="text-sm text-slate-500 mb-3">Clientes com mais chamados criados no período.</p>
+            {% if cli_lista %}
+            <div class="space-y-3">
+                {% for c in cli_lista %}
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-1">
+                        <span class="font-semibold text-slate-700 truncate max-w-[200px]">{{ c.nome }}</span>
+                        <span class="font-bold text-slate-800 ml-2">{{ c.total }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div class="h-full rounded-full bg-teal-500" style="width: {{ c.pct }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="rounded-xl bg-slate-50 p-8 text-center">
+                <p class="text-slate-400 italic">Nenhum cliente com chamados no período.</p>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+        <h2 class="text-lg font-bold text-slate-900">Distribuição por Responsável</h2>
+        <p class="text-sm text-slate-500 mb-4">Carga de trabalho por membro da equipe — chamados criados, em andamento e fechados.</p>
+        {% if resp_lista %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                        <th class="text-left py-3 pr-4">Responsável</th>
+                        <th class="text-center py-3 px-2">Abertos</th>
+                        <th class="text-center py-3 px-2">Em Prog.</th>
+                        <th class="text-center py-3 px-2">Pend.</th>
+                        <th class="text-center py-3 px-2">Fechados</th>
+                        <th class="text-center py-3 px-2">Criados</th>
+                        <th class="text-center py-3 pl-2">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for r in resp_lista %}
+                    <tr class="hover:bg-slate-50/50 transition">
+                        <td class="py-3 pr-4">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                                    {{ r.nome|first }}
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-slate-700 truncate max-w-[160px]">{{ r.nome }}</p>
+                                    <p class="text-xs text-slate-400">{{ r.role_label }}{% if r.empresa %} · {{ r.empresa }}{% endif %}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 px-2 text-center font-semibold text-slate-600">{{ r.abertos }}</td>
+                        <td class="py-3 px-2 text-center font-semibold text-blue-600">{{ r.em_progresso }}</td>
+                        <td class="py-3 px-2 text-center font-semibold text-purple-600">{{ r.pendentes }}</td>
+                        <td class="py-3 px-2 text-center font-semibold text-slate-600">{{ r.fechados }}</td>
+                        <td class="py-3 px-2 text-center font-semibold text-slate-700">{{ r.criados }}</td>
+                        <td class="py-3 pl-2 text-center">
+                            <span class="inline-flex items-center gap-2">
+                                <span class="font-bold text-slate-800">{{ r.total }}</span>
+                                <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden hidden sm:inline-block">
+                                    <div class="h-full rounded-full bg-blue-500" style="width: {{ r.pct }}%;"></div>
+                                </div>
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="rounded-xl bg-slate-50 p-8 text-center">
+            <p class="text-slate-400 italic">Nenhum chamado atribuído no período.</p>
+        </div>
+        {% endif %}
+    </section>
 
     <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
         <h2 class="text-lg font-bold text-slate-900">Status operacional atual</h2>
@@ -99,6 +305,36 @@
             <div class="rounded-lg bg-slate-50 p-4">
                 <p class="text-xs font-semibold uppercase text-slate-500">Fechados</p>
                 <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ status_operacional.fechados }}</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-white border border-slate-100 rounded-lg shadow-sm p-5">
+        <h2 class="text-lg font-bold text-slate-900">Tendência Mensal (12 meses)</h2>
+        <p class="text-sm text-slate-500 mb-4">Evolução de chamados criados, fechados e excluídos nos últimos 12 meses.</p>
+        <div class="flex items-center gap-4 text-xs font-semibold text-slate-500 mb-3">
+            <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-slate-700"></span>Criados</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-emerald-500"></span>Fechados</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-rose-500"></span>Excluídos</span>
+        </div>
+        <div class="overflow-x-auto">
+            <div class="flex h-72 min-w-max items-end gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-5">
+                {% for t in tendencia %}
+                <div class="flex h-full w-16 flex-col items-center justify-end gap-2">
+                    <div class="flex h-56 w-full items-end justify-center gap-0.5">
+                        <div title="Criados: {{ t.criados }}"
+                             class="w-3 rounded-t bg-slate-700 transition"
+                             style="height: {{ t.criados_pct }}%;"></div>
+                        <div title="Fechados: {{ t.fechados }}"
+                             class="w-3 rounded-t bg-emerald-500 transition"
+                             style="height: {{ t.fechados_pct }}%;"></div>
+                        <div title="Excluídos: {{ t.excluidos }}"
+                             class="w-3 rounded-t bg-rose-500 transition"
+                             style="height: {{ t.excluidos_pct }}%;"></div>
+                    </div>
+                    <span class="text-[11px] font-semibold text-slate-500">{{ t.rotulo }}</span>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </section>

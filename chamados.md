@@ -3573,3 +3573,165 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 **Por que breakpoint `xl` (1280px) e não `lg` (1024px) para o nav?** Com 8 itens admin no navbar mais o logo e os controles do lado direito, a largura mínima necessária ultrapassa 1024px. Calculando: logo (~120px) + 7 links de nav (~70px cada = 490px) + E-mail SMTP (~120px) + espaçamento + controles direitos (~150px) = ~900px+ sem folga. Em `lg` (1024px) ainda haveria risco de overflow com texto variável (nomes de usuário, fontes do sistema). O `xl` (1280px) garante espaço confortável para todos os itens em qualquer configuração típica.
 
 **Por que "Ver Relatórios" como botão pill acima dos cards e não como card de métrica ou link de rodapé?** O botão pill tem hierarquia visual clara (ação secundária, não primária) sem competir com "Novo Chamado" (ação primária). Acima dos cards é o local natural — o usuário vê os contadores e imediatamente tem a opção de aprofundar a análise. Um link de rodapé seria ignorado; um card de métrica confundiria navegação com dado.
+
+
+---
+
+## Relatório — 8 Etapas de Métricas ITIL 4
+
+### Etapa 1 — MTTR (Mean Time to Resolution)
+
+**Motivação:** A página de relatórios não tinha nenhuma métrica de tempo de resolução. Era necessário adicionar o Tempo Médio de Resolução (MTTR) calculado em horas úteis, seguindo práticas ITIL 4.
+
+**Arquivos alterados:** `core/views.py` (relatorios_view), `templates/core/relatorios.html`
+
+**core/views.py** — bloco MTTR adicionado na relatorios_view:
+- Itera sobre chamados fechados no período e calcula horas úteis entre criado_em e fechado_em usando _horas_uteis()
+- Calcula média, mínimo e máximo de horas de resolução
+- Função _format_horas() interna para exibição legível (ex.: "2 dias úteis e 3h", "45 min")
+- Barra de progresso colorida: verde <10h, azul 10-30h, âmbar 30-70h, vermelho >70h
+- Tratamento de lista vazia
+
+**templates/core/relatorios.html:**
+- Card de Média (destacado), Mínimo e Máximo
+- Barra de progresso referenciando 240h úteis (100%)
+- Badge com contagem de chamados considerados
+- Estado vazio quando não há dados
+
+---
+
+### Etapa 2 — Distribuição por Prioridade
+
+**Arquivos alterados:** core/views.py, templates/core/relatorios.html
+
+**core/views.py:**
+- Itera sobre 3 prioridades (baixa, média, alta)
+- Para cada: total + breakdown por status (apenas não-zero)
+- Barra proporcional ao pico
+- Paleta: verde (baixa), âmbar (média), rosa (alta)
+
+**templates/core/relatorios.html:**
+- Grid 3 colunas com cards por prioridade
+- Status breakdown + barra proporcional
+- Estado vazio
+
+---
+
+### Etapa 3 — Distribuição por Responsável
+
+**Arquivos alterados:** core/views.py, templates/core/relatorios.html
+
+**core/views.py:**
+- (1) Chamados criados no período: conta criados/fechados por responsável
+- (2) Carga operacional atual via Count(id): abertos, em_progresso, pendentes
+- Top 10 ordenado por volume total
+- Bug corrigido: _resp_op_cache substituído por contagens independentes
+
+**templates/core/relatorios.html:**
+- Tabela: avatar, nome, role/empresa, colunas de status, total
+- Barra proporcional (sm+)
+- Estado vazio
+
+---
+
+### Etapa 4 — Distribuição por Sistema e Cliente
+
+**Arquivos alterados:** core/views.py, templates/core/relatorios.html
+
+**core/views.py:** duas queries .values().annotate(Count).order_by('-total')[:8]
+- Top 8 Sistemas + Top 8 Clientes
+- default=1 no denominador, max(2) na barra mínima
+
+**templates/core/relatorios.html:**
+- Grid 2 colunas: índigo (sistemas), teal (clientes)
+
+---
+
+### Etapa 5 — Tendências Mensais (12 meses)
+
+**Arquivos alterados:** core/views.py, templates/core/relatorios.html
+
+**core/views.py:**
+- Loop 12 meses retroativos com rollback de ano
+- 3 queries/mês: criados, fechados, excluídos
+- Rótulo: "Jul/25", etc.
+
+**templates/core/relatorios.html:**
+- Barras agrupadas triplas: criados/cinza, fechados/verde, excluídos/rosa
+- Legenda + scroll horizontal
+
+---
+
+### Etapa 6 — Reincidência (Chamados Reabertos)
+
+**Migração:** 0023_auto_20260616_0951.py
+
+**core/models.py:**
+- reaberto_em (DateTime, nullable)
+- reaberto_count (Integer, default=0)
+
+**core/views.py:**
+- chamado_reopen registra reabertura com update_fields
+- relatorios_view: taxa_reincidencia = reabertos / fechados * 100
+
+**templates/core/relatorios.html:**
+- Card "Reincidência" (grid 4 colunas)
+
+---
+
+### Etapa 7 — Exportação CSV
+
+**Arquivos:** core/views.py, core/urls.py, templates/core/relatorios.html
+
+**core/views.py** — nova view relatorios_export_csv:
+- Mesmo filtro de período, 13 colunas, utf-8-sig (Excel)
+- select_related + iterator() para eficiência
+- Nome: chamados_2026.csv ou chamados_2026_06.csv
+
+**core/urls.py:** relatorios/exportar-csv/
+
+**templates/core/relatorios.html:** botão "Exportar CSV" ao lado de "Gerar Prévia"
+
+---
+
+### Etapa 8 — SLAs (Acordos de Nível de Serviço)
+
+**Migração:** 0024_auto_20260616_1005.py
+
+**core/models.py:**
+- SLADefinicao: nome, prioridade (unique), tempo limite, cor, ativo
+- Campo sla FK em Chamado
+
+**core/forms.py:** SLAForm
+
+**core/views.py:**
+- CRUD: sla_list, create, update, delete
+- Helpers: _sla_para_chamado(), _sla_status() (3 tiers)
+- Badge SLA no chamado_detail (sla_info)
+- Compliance SLA no relatório com dict lookup (evita N+1)
+
+**core/urls.py:** 4 rotas
+
+**Templates novos:** sla_list.html, sla_form.html
+
+**Templates alterados:**
+- base.html: link SLAs na navbar
+- dashboard.html: botão elegante ao lado de "Ver Relatórios"
+- chamado_detail.html: badge SLA (🟢 Dentro / 🟡 Próximo / 🔴 Violado)
+- relatorios.html: card SLA Compliance (grid 5 colunas)
+
+---
+
+## Estado Geral das Etapas
+
+| Etapa | Descrição | Status |
+|---|---|---|
+| 1 | MTTR (Tempo Médio de Resolução) | ✅ |
+| 2 | Distribuição por Prioridade | ✅ |
+| 3 | Distribuição por Responsável | ✅ |
+| 4 | Distribuição por Sistema e Cliente | ✅ |
+| 5 | Tendências Mensais (12 meses) | ✅ |
+| 6 | Reincidência (Chamados Reabertos) | ✅ |
+| 7 | Exportação CSV | ✅ |
+| 8 | SLAs (Acordos de Nível de Serviço) | ✅ |
+

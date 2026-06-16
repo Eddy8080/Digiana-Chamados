@@ -63,6 +63,9 @@ class Chamado(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
     fechado_em = models.DateTimeField(null=True, blank=True)
+    reaberto_em = models.DateTimeField(null=True, blank=True, verbose_name='Última reabertura')
+    reaberto_count = models.IntegerField(default=0, verbose_name='Vezes reaberto')
+    sla = models.ForeignKey('SLADefinicao', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='SLA aplicado')
     excluido = models.BooleanField(default=False)
     excluido_em = models.DateTimeField(null=True, blank=True)
     excluido_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='chamados_excluidos')
@@ -161,6 +164,38 @@ class Resposta(models.Model):
 
 def _anexo_upload_path(instance, filename):
     return f'chamados/{instance.chamado_id}/anexos/{filename}'
+
+
+class SLADefinicao(models.Model):
+    PRIORIDADE_CHOICES = Chamado.PRIORIDADE_CHOICES
+
+    nome = models.CharField(max_length=100, verbose_name='Nome do SLA')
+    descricao = models.TextField(blank=True, null=True, verbose_name='Descrição')
+    prioridade = models.CharField(
+        max_length=20, choices=PRIORIDADE_CHOICES, unique=True,
+        verbose_name='Prioridade',
+        help_text='Cada prioridade pode ter apenas um SLA ativo por vez.',
+    )
+    tempo_limite_horas = models.FloatField(
+        verbose_name='Tempo limite (horas úteis)',
+        help_text='Limite em horas úteis (seg–sex 08h–18h) para resolução.',
+    )
+    cor_classe = models.CharField(
+        max_length=100, default='bg-emerald-100 text-emerald-800',
+        verbose_name='Classe CSS do badge',
+        help_text='Tailwind: bg-{cor}-100 text-{cor}-800',
+    )
+    ativo = models.BooleanField(default=True, verbose_name='Ativo')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Definição de SLA'
+        verbose_name_plural = 'Definições de SLA'
+        ordering = ['prioridade']
+
+    def __str__(self):
+        return f'{self.nome} ({self.get_prioridade_display()})'
 
 
 class Anexo(models.Model):

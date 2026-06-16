@@ -23,8 +23,8 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.csrf import csrf_exempt
-from .models import Cliente, Projeto, Chamado, ConfigurarEmail, PerfilUsuario, Sistema, Anexo, Resposta
-from .forms import ClienteForm, ProjetoForm, ChamadoForm, UserRegisterForm, UsuarioEditForm, ConfigurarEmailForm, SistemaForm
+from .models import Cliente, Projeto, Chamado, ConfigurarEmail, PerfilUsuario, Sistema, SLADefinicao, Anexo, Resposta
+from .forms import ClienteForm, ProjetoForm, ChamadoForm, UserRegisterForm, UsuarioEditForm, ConfigurarEmailForm, SistemaForm, SLAForm
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +321,295 @@ def relatorios_view(request):
     total_excluidos = excluidos_qs.count()
     taxa_fechamento = round((total_fechados / total_criados) * 100, 1) if total_criados else 0
 
+    # ── Reincidência (chamados reabertos no período) ──────────────────────
+    reabertos_qs = Chamado.objects.filter(
+        excluido=False,
+        reaberto_count__gt=0,
+        reaberto_em__gte=inicio,
+        reaberto_em__lt=fim,
+    )
+    total_reabertos = reabertos_qs.count()
+    # Reincidência = reabertos / fechados (proporção de chamados que reabriram)
+    taxa_reincidencia = round((total_reabertos / total_fechados) * 100, 1) if total_fechados else 0
+
+    # ── MTTR (Tempo Médio de Resolução em horas úteis) ────────────────────
+    mttr_horas = 0.0
+    mttr_min = 0.0
+    mttr_max = 0.0
+    mttr_count = 0
+    mttr_detalhes = []
+    for ch in fechados_qs.only('criado_em', 'fechado_em'):
+        if ch.fechado_em:
+            h = _horas_uteis(ch.criado_em, ch.fechado_em)
+            mttr_detalhes.append(h)
+            mttr_count += 1
+    if mttr_count > 0:
+        mttr_horas = sum(mttr_detalhes) / mttr_count
+        mttr_min = min(mttr_detalhes)
+        mttr_max = max(mttr_detalhes)
+
+    def _format_horas(h):
+        """Formata float de horas em string legível (ex.: 12h 30min)."""
+        h_int = int(h)
+        min_part = int(round((h - h_int) * 60))
+        if h_int <= 0 and min_part <= 0:
+            return "0 min"
+        if h_int <= 0:
+            return f"{min_part} min"
+        dias = h_int // 10
+        resto = h_int % 10
+        if dias == 0:
+            return f"{h_int}h{min_part:02d}min" if min_part else f"{h_int}h"
+        if dias == 1:
+            return f"1 dia útil" + (f" e {resto}h" if resto else "")
+        return f"{dias} dias úteis" + (f" e {resto}h" if resto else "")
+
+    mttr_label = _format_horas(mttr_horas)
+    mttr_min_label = _format_horas(mttr_min) if mttr_count else "—"
+    mttr_max_label = _format_horas(mttr_max) if mttr_count else "—"
+
+    # Cor e barra do MTTR (mesma escala da barra de tempo)
+    if mttr_horas < 10:
+        mttr_cor = 'text-emerald-600'
+        mttr_bg = 'bg-emerald-50'
+        mttr_badge = 'bg-emerald-100 text-emerald-700'
+        mttr_barra = 'bg-emerald-500'
+    elif mttr_horas < 30:
+        mttr_cor = 'text-blue-600'
+        mttr_bg = 'bg-blue-50'
+        mttr_badge = 'bg-blue-100 text-blue-700'
+        mttr_barra = 'bg-blue-500'
+    elif mttr_horas < 70:
+        mttr_cor = 'text-amber-600'
+        mttr_bg = 'bg-amber-50'
+        mttr_badge = 'bg-amber-100 text-amber-700'
+        mttr_barra = 'bg-amber-500'
+    else:
+        mttr_cor = 'text-rose-600'
+        mttr_bg = 'bg-rose-50'
+        mttr_badge = 'bg-rose-100 text-rose-700'
+        mttr_barra = 'bg-rose-500'
+
+    # Percentual da barra (referência: 240h úteis = 100%, mesma escala)
+    mttr_pct = max(2, min(100, round(mttr_horas / 240 * 100))) if mttr_count else 0
+
+    # ── Distribuição por Prioridade ────────────────────────────────────────
+    prioridade_labels = {'baixa': 'Baixa', 'media': 'Média', 'alta': 'Alta'}
+    prioridade_cores = {
+        'baixa': {'bg': 'bg-emerald-50', 'text': 'text-emerald-600', 'badge': 'bg-emerald-100 text-emerald-700', 'barra': 'bg-emerald-500'},
+        'media': {'bg': 'bg-amber-50',  'text': 'text-amber-600',  'badge': 'bg-amber-100 text-amber-700',  'barra': 'bg-amber-500'},
+        'alta':  {'bg': 'bg-rose-50',   'text': 'text-rose-600',   'badge': 'bg-rose-100 text-rose-700',    'barra': 'bg-rose-500'},
+    }
+    status_choices_dict = dict(Chamado.STATUS_CHOICES)
+    prioridade_distribuicao = []
+    max_prioridade_count = 1
+    for prio in ('baixa', 'media', 'alta'):
+        qs_prio = criados_qs.filter(prioridade=prio)
+        total_prio = qs_prio.count()
+        if total_prio > max_prioridade_count:
+            max_prioridade_count = total_prio
+        # Breakdown por status dentro desta prioridade
+        status_breakdown = []
+        for cod_status, _ in Chamado.STATUS_CHOICES:
+            cnt = qs_prio.filter(status=cod_status).count()
+            if cnt:
+                status_breakdown.append({'codigo': cod_status, 'rotulo': status_choices_dict[cod_status], 'count': cnt})
+        prioridade_distribuicao.append({
+            'codigo': prio,
+            'rotulo': prioridade_labels[prio],
+            'total': total_prio,
+            'pct': round(total_prio / max_prioridade_count * 100) if max_prioridade_count else 0,
+            'cor': prioridade_cores[prio],
+            'status_breakdown': status_breakdown,
+        })
+
+    # ── Distribuição por Responsável ──────────────────────────────────────
+    _ROLE_LABEL = {
+        'diretor_ti':  'Dir. TI',
+        'diretor':     'Diretor',
+        'coordenador': 'Coord.',
+        'dev':         'Dev',
+        'analista':    'System',
+        'usr':         'Usuário',
+    }
+
+    def _init_resp_dict(resp):
+        try:
+            role_label = _ROLE_LABEL.get(resp.perfil.role, '—')
+            empresa = resp.perfil.cliente.nome if resp.perfil.cliente else ''
+        except Exception:
+            role_label = '—'
+            empresa = ''
+        return {
+            'id': resp.pk,
+            'nome': resp.get_full_name() or resp.username,
+            'role_label': role_label,
+            'empresa': empresa,
+            'criados': 0, 'fechados': 0,
+            'em_progresso': 0, 'abertos': 0, 'pendentes': 0,
+        }
+
+    resp_agregado = {}
+    # (1) Chamados criados no período — conta criados e fechados
+    for ch in criados_qs.select_related('responsavel__perfil__cliente').only(
+        'responsavel_id', 'responsavel__first_name', 'responsavel__username',
+        'responsavel__perfil__role', 'responsavel__perfil__cliente__nome', 'status'
+    ):
+        resp = ch.responsavel
+        if resp is None:
+            continue
+        rid = resp.pk
+        if rid not in resp_agregado:
+            resp_agregado[rid] = _init_resp_dict(resp)
+        resp_agregado[rid]['criados'] += 1
+        if ch.status == 'fechado':
+            resp_agregado[rid]['fechados'] += 1
+
+    # (2) Carga operacional atual — chamados abertos/em_progresso/pendentes agora
+    op_atual = (
+        operacionais_qs.filter(responsavel__isnull=False, status__in=('aberto', 'em_progresso', 'pendente'))
+        .values('responsavel_id', 'status')
+        .annotate(total=Count('id'))
+    )
+    for item in op_atual:
+        rid = item['responsavel_id']
+        if rid not in resp_agregado:
+            # Responsável que não criou chamados no período mas tem chamados ativos
+            try:
+                u = User.objects.select_related('perfil__cliente').get(pk=rid)
+                resp_agregado[rid] = _init_resp_dict(u)
+            except User.DoesNotExist:
+                continue
+        status = item['status']
+        total = item['total']
+        if status == 'aberto':
+            resp_agregado[rid]['abertos'] += total
+        elif status == 'em_progresso':
+            resp_agregado[rid]['em_progresso'] += total
+        elif status == 'pendente':
+            resp_agregado[rid]['pendentes'] += total
+
+    # ── Tendência Mensal (últimos 12 meses) ────────────────────────────────
+    tendencia = []
+    hoje_dt = timezone.localdate()
+    tend_max = 1
+    for i in range(11, -1, -1):
+        # Mês = hoje_dt - i meses
+        m = hoje_dt.month - i
+        a = hoje_dt.year
+        while m <= 0:
+            m += 12
+            a -= 1
+        ultimo_dia = calendar.monthrange(a, m)[1]
+        mes_inicio = timezone.make_aware(datetime(a, m, 1))
+        mes_fim = timezone.make_aware(datetime(a, m, ultimo_dia, 23, 59, 59, 999999)) + timedelta(microseconds=1)
+
+        criados_m = Chamado.objects.filter(criado_em__gte=mes_inicio, criado_em__lt=mes_fim).count()
+        fechados_m = Chamado.objects.filter(
+            excluido=False, status='fechado',
+            fechado_em__gte=mes_inicio, fechado_em__lt=mes_fim,
+        ).count()
+        excluidos_m = Chamado.objects.filter(
+            excluido=True,
+            excluido_em__gte=mes_inicio, excluido_em__lt=mes_fim,
+        ).count()
+
+        rotulo_mes = dict(meses)[m][:3]
+        tend_max = max(tend_max, criados_m, fechados_m, excluidos_m)
+        tendencia.append({
+            'rotulo': f"{rotulo_mes}/{str(a)[-2:]}",
+            'criados': criados_m,
+            'fechados': fechados_m,
+            'excluidos': excluidos_m,
+        })
+
+    for t in tendencia:
+        t['criados_pct'] = max(2, round(t['criados'] / tend_max * 100)) if tend_max else 0
+        t['fechados_pct'] = max(2, round(t['fechados'] / tend_max * 100)) if tend_max else 0
+        t['excluidos_pct'] = max(2, round(t['excluidos'] / tend_max * 100)) if tend_max else 0
+
+    # ── Compliance SLA ──────────────────────────────────────────────────────
+    sla_compliance = None
+    sla_total = 0
+    sla_dentro = 0
+    sla_violados = 0
+    sla_por_prioridade = {
+        s.prioridade: s
+        for s in SLADefinicao.objects.filter(ativo=True)
+    }
+    fechados_com_sla = [
+        ch for ch in fechados_qs.select_related('sla').only('sla_id', 'criado_em', 'fechado_em', 'prioridade')
+        if ch.fechado_em
+    ]
+    if fechados_com_sla:
+        for ch in fechados_com_sla:
+            # Tenta o sla FK, senão fallback pelo dict de prioridade
+            sla_def = None
+            if ch.sla_id:
+                try:
+                    sla_def = ch.sla
+                except SLADefinicao.DoesNotExist:
+                    pass
+            if sla_def is None:
+                sla_def = sla_por_prioridade.get(ch.prioridade)
+            if sla_def is None:
+                continue
+            sla_total += 1
+            horas_gastas = _horas_uteis(ch.criado_em, ch.fechado_em)
+            violado = horas_gastas > sla_def.tempo_limite_horas
+            if violado:
+                sla_violados += 1
+            else:
+                sla_dentro += 1
+        if sla_total > 0:
+            sla_compliance = round(sla_dentro / sla_total * 100, 1)
+
+    # ── Distribuição por Sistema (top 8) ───────────────────────────────────
+    sist_counts = (
+        criados_qs.filter(sistema__isnull=False)
+        .values('sistema__nome', 'sistema_id')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:8]
+    )
+    sist_lista = []
+    sist_max = max((s['total'] for s in sist_counts), default=1)
+    for s in sist_counts:
+        sist_lista.append({
+            'nome': s['sistema__nome'],
+            'total': s['total'],
+            'pct': max(2, round(s['total'] / sist_max * 100)),
+        })
+
+    # ── Distribuição por Cliente (top 8) ────────────────────────────────────
+    cli_counts = (
+        criados_qs.filter(projeto__cliente__isnull=False)
+        .values('projeto__cliente__nome', 'projeto__cliente_id')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:8]
+    )
+    cli_lista = []
+    cli_max = max((c['total'] for c in cli_counts), default=1)
+    for c in cli_counts:
+        cli_lista.append({
+            'nome': c['projeto__cliente__nome'],
+            'total': c['total'],
+            'pct': max(2, round(c['total'] / cli_max * 100)),
+        })
+
+    # Ordena por total (decrescente) e pega top 10
+    resp_lista = sorted(
+        resp_agregado.values(),
+        key=lambda x: x['criados'] + x['fechados'] + x['em_progresso'] + x['abertos'] + x['pendentes'],
+        reverse=True
+    )[:10]
+    max_resp_total = max(
+        (r['criados'] + r['fechados'] + r['em_progresso'] + r['abertos'] + r['pendentes']) for r in resp_lista
+    ) if resp_lista else 1
+    for r in resp_lista:
+        total_r = r['criados'] + r['fechados'] + r['em_progresso'] + r['abertos'] + r['pendentes']
+        r['total'] = total_r
+        r['pct'] = max(2, round(total_r / max_resp_total * 100)) if max_resp_total else 2
+
     status_operacional = {
         'abertos': operacionais_qs.filter(status='aberto').count(),
         'em_progresso': operacionais_qs.filter(status='em_progresso').count(),
@@ -383,7 +672,100 @@ def relatorios_view(request):
         'taxa_fechamento': taxa_fechamento,
         'status_operacional': status_operacional,
         'chart_points': chart_points,
+        'mttr_label': mttr_label,
+        'mttr_min_label': mttr_min_label,
+        'mttr_max_label': mttr_max_label,
+        'mttr_count': mttr_count,
+        'mttr_cor': mttr_cor,
+        'mttr_bg': mttr_bg,
+        'mttr_badge': mttr_badge,
+        'mttr_barra': mttr_barra,
+        'mttr_pct': mttr_pct,
+        'total_reabertos': total_reabertos,
+        'taxa_reincidencia': taxa_reincidencia,
+        'prioridade_distribuicao': prioridade_distribuicao,
+        'resp_lista': resp_lista,
+        'sist_lista': sist_lista,
+        'cli_lista': cli_lista,
+        'tendencia': tendencia,
+        'sla_compliance': sla_compliance,
+        'sla_total': sla_total,
+        'sla_dentro': sla_dentro,
+        'sla_violados': sla_violados,
     })
+
+
+import csv
+
+
+@login_required(login_url='login')
+def relatorios_export_csv(request):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+
+    hoje = timezone.localdate()
+    modo = request.GET.get('modo', 'mensal')
+    if modo not in ('mensal', 'anual'):
+        modo = 'mensal'
+
+    try:
+        ano = int(request.GET.get('ano', hoje.year))
+    except (TypeError, ValueError):
+        ano = hoje.year
+
+    try:
+        mes = int(request.GET.get('mes', hoje.month))
+    except (TypeError, ValueError):
+        mes = hoje.month
+    mes = min(max(mes, 1), 12)
+
+    if modo == 'anual':
+        inicio = timezone.make_aware(datetime(ano, 1, 1))
+        fim = timezone.make_aware(datetime(ano + 1, 1, 1))
+        nome_arquivo = f'chamados_{ano}.csv'
+    else:
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        inicio = timezone.make_aware(datetime(ano, mes, 1))
+        fim = timezone.make_aware(datetime(ano, mes, ultimo_dia, 23, 59, 59, 999999)) + timedelta(microseconds=1)
+        nome_arquivo = f'chamados_{ano}_{mes:02d}.csv'
+
+    qs = Chamado.objects.filter(
+        excluido=False,
+        criado_em__gte=inicio,
+        criado_em__lt=fim,
+    ).select_related(
+        'projeto__cliente', 'responsavel', 'criado_por', 'sistema'
+    ).order_by('criado_em')
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Titulo', 'Projeto', 'Cliente', 'Sistema',
+        'Prioridade', 'Status', 'Responsavel', 'Criado por',
+        'Criado em', 'Fechado em', 'Reaberto_count', 'Ultima reabertura',
+    ])
+
+    for ch in qs.iterator():
+        writer.writerow([
+            ch.id,
+            ch.titulo,
+            ch.projeto.nome,
+            ch.projeto.cliente.nome if ch.projeto.cliente else '',
+            ch.sistema.nome if ch.sistema else '',
+            ch.get_prioridade_display(),
+            ch.get_status_display(),
+            ch.responsavel.get_full_name() or ch.responsavel.username if ch.responsavel else '',
+            ch.criado_por.get_full_name() or ch.criado_por.username if ch.criado_por else '',
+            timezone.localtime(ch.criado_em).strftime('%d/%m/%Y %H:%M'),
+            timezone.localtime(ch.fechado_em).strftime('%d/%m/%Y %H:%M') if ch.fechado_em else '',
+            ch.reaberto_count,
+            timezone.localtime(ch.reaberto_em).strftime('%d/%m/%Y %H:%M') if ch.reaberto_em else '',
+        ])
+
+    return response
 
 
 @login_required(login_url='login')
@@ -843,6 +1225,18 @@ def chamado_detail(request, pk):
     )
     chamado_anexos = chamado.anexos.filter(resposta__isnull=True).select_related('criado_por')
 
+    # ── SLA ────────────────────────────────────────────────────────────────
+    sla_def = _sla_para_chamado(chamado)
+    sla_rotulo, sla_cor, sla_icone, sla_horas, sla_limite, sla_violado = _sla_status(chamado, sla_def)
+    sla_info = {
+        'rotulo': sla_rotulo,
+        'cor_classe': sla_cor,
+        'icone': sla_icone,
+        'horas_gastas': sla_horas,
+        'limite': sla_limite,
+        'violado': sla_violado,
+    }
+
     return render(request, 'core/chamado_detail.html', {
         'chamado':         chamado,
         'form':            form,
@@ -858,6 +1252,7 @@ def chamado_detail(request, pk):
         'is_responsavel':  is_responsavel,
         'respostas':       respostas,
         'chamado_anexos':  chamado_anexos,
+        'sla_info':        sla_info,
     })
 
 
@@ -1137,8 +1532,10 @@ def chamado_reopen(request, pk):
     if request.method == 'POST' and chamado.status in ('resolvido', 'fechado'):
         status_anterior = chamado.status
         chamado.status = 'aberto'
+        chamado.reaberto_em = timezone.now()
+        chamado.reaberto_count = (chamado.reaberto_count or 0) + 1
         _registrar_fechamento(chamado, status_anterior=status_anterior)
-        chamado.save()
+        chamado.save(update_fields=['status', 'reaberto_em', 'reaberto_count', 'atualizado_em', 'fechado_em'])
 
         destinatarios = _build_destinatarios(chamado)
         if destinatarios:
@@ -1420,6 +1817,98 @@ def sistema_update(request, pk):
     else:
         form = SistemaForm(instance=sistema)
     return render(request, 'core/sistema_form.html', {'form': form, 'title': 'Editar Sistema'})
+
+
+@login_required(login_url='login')
+def sla_list(request):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    qs = SLADefinicao.objects.all().order_by('prioridade')
+    return render(request, 'core/sla_list.html', {'slas': qs})
+
+
+@login_required(login_url='login')
+def sla_create(request):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method == 'POST':
+        form = SLAForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "SLA cadastrado com sucesso!")
+            return redirect('sla_list')
+    else:
+        form = SLAForm()
+    return render(request, 'core/sla_form.html', {'form': form, 'title': 'Cadastrar SLA'})
+
+
+@login_required(login_url='login')
+def sla_update(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    sla = get_object_or_404(SLADefinicao, pk=pk)
+    if request.method == 'POST':
+        form = SLAForm(request.POST, instance=sla)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"SLA '{sla.nome}' atualizado com sucesso!")
+            return redirect('sla_list')
+    else:
+        form = SLAForm(instance=sla)
+    return render(request, 'core/sla_form.html', {'form': form, 'title': f'Editar SLA — {sla.nome}'})
+
+
+@login_required(login_url='login')
+def sla_delete(request, pk):
+    if _role(request.user) != 'admin':
+        messages.error(request, "Acesso negado.")
+        return redirect('dashboard')
+    if request.method != 'POST':
+        return redirect('sla_list')
+    sla = get_object_or_404(SLADefinicao, pk=pk)
+    nome = sla.nome
+    sla.delete()
+    messages.success(request, f"SLA '{nome}' excluído.")
+    return redirect('sla_list')
+
+
+# ── Helpers para cálculo de SLA ─────────────────────────────────────────────
+
+def _sla_para_chamado(chamado):
+    """Retorna o SLADefinicao aplicável a um chamado (pelo FK ou pela prioridade)."""
+    if chamado.sla_id:
+        try:
+            return chamado.sla
+        except SLADefinicao.DoesNotExist:
+            pass
+    return SLADefinicao.objects.filter(prioridade=chamado.prioridade, ativo=True).first()
+
+
+def _sla_status(chamado, sla_def=None):
+    """Calcula o status de SLA de um chamado.
+    Retorna (rotulo, cor_classe, icone_descricao, horas_gastas, limite_horas, violado).
+    """
+    if sla_def is None:
+        sla_def = _sla_para_chamado(chamado)
+    if sla_def is None:
+        return ('Sem SLA', 'bg-slate-100 text-slate-600', '—', 0, 0, False)
+
+    agora = timezone.now()
+    dt_fim = chamado.fechado_em or chamado.atualizado_em or agora
+    horas_gastas = _horas_uteis(chamado.criado_em, dt_fim)
+    limite = sla_def.tempo_limite_horas
+    violado = horas_gastas > limite
+    proporcao = (horas_gastas / limite) if limite > 0 else 1
+
+    if violado:
+        return ('SLA Violado', 'bg-rose-100 text-rose-800', '🔴', horas_gastas, limite, True)
+    elif proporcao >= 0.8:
+        return ('Próximo do Limite', 'bg-amber-100 text-amber-800', '🟡', horas_gastas, limite, False)
+    else:
+        return ('Dentro do SLA', 'bg-emerald-100 text-emerald-800', '🟢', horas_gastas, limite, False)
 
 
 @login_required(login_url='login')

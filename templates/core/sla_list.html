@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}SLAs — Digiana{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-extrabold text-slate-900">Definições de SLA</h1>
+            <p class="text-sm text-slate-500 mt-1">Acordos de Nível de Serviço — prazos de resolução por prioridade.</p>
+        </div>
+        <a href="{% url 'sla_create' %}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg transition text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Novo SLA
+        </a>
+    </div>
+
+    {% if slas %}
+    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <th class="text-left px-5 py-3">Nome</th>
+                    <th class="text-left px-5 py-3">Prioridade</th>
+                    <th class="text-center px-5 py-3">Limite (horas úteis)</th>
+                    <th class="text-center px-5 py-3">Ativo</th>
+                    <th class="text-right px-5 py-3">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for sla in slas %}
+                <tr class="hover:bg-slate-50/50 transition">
+                    <td class="px-5 py-4">
+                        <span class="font-semibold text-slate-800">{{ sla.nome }}</span>
+                        {% if sla.descricao %}
+                        <p class="text-xs text-slate-400 mt-0.5">{{ sla.descricao|truncatechars:60 }}</p>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold
+                            {% if sla.prioridade == 'alta' %}bg-rose-50 text-rose-700
+                            {% elif sla.prioridade == 'media' %}bg-amber-50 text-amber-700
+                            {% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ sla.get_prioridade_display }}
+                        </span>
+                    </td>
+                    <td class="px-5 py-4 text-center font-semibold text-slate-700">{{ sla.tempo_limite_horas }}h</td>
+                    <td class="px-5 py-4 text-center">
+                        {% if sla.ativo %}
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                            </svg>
+                            Ativo
+                        </span>
+                        {% else %}
+                        <span class="text-xs font-semibold text-slate-400">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'sla_update' sla.pk %}"
+                               class="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition">
+                                Editar
+                            </a>
+                            <form method="POST" action="{% url 'sla_delete' sla.pk %}" class="inline"
+                                  onsubmit="return confirm('Excluir SLA &quot;{{ sla.nome }}&quot;?');">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="px-3 py-1.5 text-xs font-semibold bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition">
+                                    Excluir
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
+        <div class="text-4xl mb-3">📋</div>
+        <h2 class="text-lg font-bold text-slate-800 mb-1">Nenhum SLA cadastrado</h2>
+        <p class="text-sm text-slate-400 mb-4">Crie SLAs para definir prazos de resolução por prioridade de chamado.</p>
+        <a href="{% url 'sla_create' %}"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Criar Primeiro SLA
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
