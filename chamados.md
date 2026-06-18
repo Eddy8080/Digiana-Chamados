@@ -3239,7 +3239,7 @@ O **Zoho ZeptoMail** é o produto da própria Zoho criado especificamente para e
 - Campo `remetente` separado do `usuario` — o "De:" pode ser diferente do login SMTP
 - Botões Editar e Excluir sempre visíveis para qualquer configuração (ativa ou não)
 
-### Migrações
+### Migrações Propostas
 
 | Migration | Campo adicionado |
 |---|---|
@@ -3976,8 +3976,10 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 ## Estudo — Extensão para Atendimento de Hardware (Sistemas/Hardware)
 
 **Data do estudo:** 2026-06-16  
-**Status:** Planejado — não implementado  
-**Motivação:** O menu "Sistemas" cobre exclusivamente sistemas de software. A equipe também realiza atendimento de ativos físicos (hardware), cujo ciclo de vida, rastreabilidade e histórico de chamados não têm suporte na aplicação atual.
+**Status:** Planejado — não implementado no código atual  
+**Motivação:** O menu "Sistemas" cobre exclusivamente sistemas de software. A equipe também avalia atendimento de ativos físicos (hardware), mas isso ainda não existe neste repositório.
+
+> Atenção: toda esta seção é um estudo/proposta de arquitetura. Os blocos abaixo não descrevem o estado atual do código e não devem ser tratados como implementados.
 
 ---
 
@@ -4020,6 +4022,8 @@ Misturar hardware e software no mesmo modelo introduziria dezenas de campos null
 
 ### Arquitetura Proposta
 
+O desenho abaixo continua válido como rascunho arquitetural, mas ainda não foi implementado.
+
 #### Visão geral da extensão
 
 ```
@@ -4036,7 +4040,7 @@ Todas as adições são **retrocompatíveis**: campos nullable, nenhum registro 
 
 ---
 
-### Modelo `Hardware` — Especificação Completa
+### Modelo `Hardware` — Especificação Proposta
 
 **Arquivo:** `core/models.py` — inserir após `Sistema`, antes de `Cliente`
 
@@ -4192,7 +4196,7 @@ tipo = models.CharField(
 
 ---
 
-### Migrações
+### Migrações Propostas
 
 | Arquivo | Operações |
 |---|---|
@@ -4210,7 +4214,7 @@ def classificar_chamados_existentes(apps, schema_editor):
 
 ---
 
-### Forms
+### Forms Propostos
 
 #### `HardwareForm` (novo em `core/forms.py`)
 
@@ -4270,7 +4274,7 @@ hardware = forms.ModelChoiceField(
 
 ---
 
-### Views
+### Views Propostas
 
 #### Novas views em `core/views.py`
 
@@ -4384,7 +4388,7 @@ path('hardware/<int:pk>/excluir/',    views.hardware_delete, name='hardware_dele
 
 ---
 
-### Templates
+### Templates Propostos
 
 #### `hardware_list.html` — estrutura
 
@@ -4689,7 +4693,7 @@ Nenhum role existente é alterado. As novas permissões se encaixam na matriz ex
 
 ---
 
-### Fases de Implementação
+### Fases de Implementação Propostas
 
 | Fase | Escopo | Arquivos afetados | Migrações |
 |---|---|---|---|
@@ -4702,7 +4706,7 @@ Nenhum role existente é alterado. As novas permissões se encaixam na matriz ex
 
 ---
 
-### Decisões de Arquitetura — Hardware
+### Decisões de Arquitetura — Hardware (Proposta)
 
 **Por que modelo `Hardware` separado e não estender `Sistema`?** Hardware e software têm atributos estruturalmente diferentes. Número de série, patrimônio, localização física, garantia e valor de aquisição não fazem sentido para software. Misturar os dois no mesmo modelo criaria dezenas de campos `null=True` em todos os registros de software — violação da Primeira Forma Normal. A separação mantém cada modelo coeso e evita lógica condicional desnecessária em formulários e templates.
 
@@ -4723,18 +4727,18 @@ Nenhum role existente é alterado. As novas permissões se encaixam na matriz ex
 | Item | Status |
 |---|---|
 | Análise do estado atual | ✅ Concluído |
-| Modelo `Hardware` — especificação | ✅ Concluído |
-| Mudanças em `Chamado` | ✅ Concluído |
-| Migrações | ✅ Especificadas |
-| Forms | ✅ Especificados |
-| Views — especificação | ✅ Concluído |
-| URLs | ✅ Especificadas |
-| Templates — wireframes | ✅ Concluído |
-| Navegação | ✅ Especificada |
-| Dashboard | ✅ Especificado |
-| Relatórios | ✅ Especificados |
+| Modelo `Hardware` — especificação | ✅ Concluída como proposta |
+| Mudanças em `Chamado` | ✅ Concluídas como proposta |
+| Migrações | ✅ Especificadas no estudo |
+| Forms | ✅ Especificados no estudo |
+| Views — especificação | ✅ Concluídas como proposta |
+| URLs | ✅ Especificadas no estudo |
+| Templates — wireframes | ✅ Concluídos como proposta |
+| Navegação | ✅ Especificada como proposta |
+| Dashboard | ✅ Especificado como proposta |
+| Relatórios | ✅ Especificados como proposta |
 | RBAC | ✅ Analisado |
-| Avaliação de risco | ✅ Concluído |
+| Avaliação de risco | ✅ Concluída |
 | **Implementação** | ⏳ Pendente |
 
 ---
@@ -4851,4 +4855,3 @@ O DNS de `anagma.com.br` pode estar em dois lugares:
 | Adição dos registros no DNS | ⏳ Pendente |
 | Verificação no Brevo | ⏳ Pendente |
 | Teste de envio para `@anagma.com.br` | ⏳ Pendente |
-
