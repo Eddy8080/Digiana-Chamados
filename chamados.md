@@ -4,12 +4,200 @@ Documentação técnica completa do projeto: histórico de implementações, est
 
 ---
 
+## Arquitetura do Sistema
+
+### ERD — Diagrama de Entidades e Relacionamentos
+
+```mermaid
+erDiagram
+    User {
+        int id PK
+        string username
+        string email
+        string first_name
+        string last_name
+        bool is_staff
+        bool is_superuser
+    }
+
+    PerfilUsuario {
+        int id PK
+        int user_id FK
+        int cliente_id FK
+        string role
+        bool must_change_password
+        bool email_verificar
+        string celular
+        string whatsapp
+        string telefone_fixo
+        image foto
+    }
+
+    Cliente {
+        int id PK
+        string nome
+        string cpf_cnpj
+        string email
+        string telefone
+        datetime criado_em
+    }
+
+    Projeto {
+        int id PK
+        int cliente_id FK
+        string nome
+        text descricao
+        datetime criado_em
+    }
+
+    Sistema {
+        int id PK
+        string nome
+        text descricao
+        bool ativo
+        datetime criado_em
+    }
+
+    SLADefinicao {
+        int id PK
+        string nome
+        text descricao
+        string prioridade
+        float tempo_limite_horas
+        string cor_classe
+        bool ativo
+        datetime criado_em
+        datetime atualizado_em
+    }
+
+    Chamado {
+        int id PK
+        int projeto_id FK
+        int sistema_id FK
+        int sla_id FK
+        int criado_por_id FK
+        int responsavel_id FK
+        int excluido_por_id FK
+        string titulo
+        text descricao
+        string status
+        string prioridade
+        datetime criado_em
+        datetime atualizado_em
+        datetime fechado_em
+        bool excluido
+        datetime excluido_em
+        text motivo_exclusao
+        int reaberto_count
+        datetime reaberto_em
+    }
+
+    Resposta {
+        int id PK
+        int chamado_id FK
+        int autor_id FK
+        int resposta_pai_id FK
+        text conteudo
+        datetime criado_em
+    }
+
+    Anexo {
+        int id PK
+        int chamado_id FK
+        int resposta_id FK
+        int criado_por_id FK
+        file arquivo
+        string nome_original
+        string tipo_mime
+        datetime criado_em
+    }
+
+    ConfigurarEmail {
+        int id PK
+        string nome
+        bool ativo
+        string servidor_smtp
+        int porta
+        string usuario
+        string remetente
+        string senha
+        bool use_tls
+        bool use_ssl
+        bool usar_api
+        datetime atualizado_em
+    }
+
+    %% ── User como hub central ──────────────────────────────
+    User ||--|| PerfilUsuario        : "tem perfil"
+    User ||--o{ Chamado              : "criou"
+    User ||--o{ Chamado              : "é responsável"
+    User ||--o{ Chamado              : "excluiu"
+    User }o--o{ Chamado              : "observa (M2M)"
+    User ||--o{ Resposta             : "autor"
+    User ||--o{ Anexo                : "enviou"
+
+    %% ── Hierarquia principal ───────────────────────────────
+    Cliente   ||--|{ Projeto         : "possui"
+    Cliente   ||--o{ PerfilUsuario   : "vincula usuário"
+    Projeto   ||--|{ Chamado         : "contém"
+
+    %% ── Vínculos opcionais do Chamado ──────────────────────
+    Sistema      ||--o{ Chamado      : "afeta"
+    SLADefinicao ||--o{ Chamado      : "define SLA"
+
+    %% ── Conteúdo do Chamado ────────────────────────────────
+    Chamado  ||--o{ Resposta         : "tem"
+    Chamado  ||--o{ Anexo            : "tem"
+
+    %% ── Árvore de respostas (self-referential) ─────────────
+    Resposta ||--o{ Resposta         : "responde a"
+    Resposta ||--o{ Anexo            : "tem"
+```
+
+**Como ler:**
+
+| Símbolo | Significado |
+|---|---|
+| `\|\|` | Exatamente um (obrigatório) |
+| `o\|` | Zero ou um (opcional) |
+| `\|{` | Um ou mais |
+| `o{` | Zero ou mais |
+
+**Observações críticas do diagrama:**
+
+- **`User` é o hub central** — FK em 7 lugares (`criado_por`, `responsavel`, `excluido_por`, `observadores` M2M, `autor` de Resposta, `criado_por` de Anexo, `PerfilUsuario`). Toda feature nova que envolva usuário passa por ele.
+- **`Chamado` é o modelo mais complexo** — 7 FKs, 1 M2M, 19 campos. Maior risco em migrations.
+- **`Resposta` tem auto-referência** — `resposta_pai_id` aponta para si mesmo; cuidado em queries recursivas.
+- **`ConfigurarEmail` é isolado** — nenhuma FK para outros modelos; configuração pura.
+
+**Onde `Hardware` se encaixa (feature planejada — não implementada):**
+
+```
+Hardware → FK Cliente (SET_NULL)
+Hardware → FK User/responsavel (SET_NULL)
+Chamado  → FK Hardware (SET_NULL, nullable)   ← campo novo
+Chamado  → campo tipo: 'software' | 'hardware' | 'geral'   ← campo novo
+```
+
+Relação a adicionar no ERD quando implementado:
+```
+Hardware ||--o{ Chamado : "afetado em"
+Cliente  ||--o{ Hardware : "possui"
+User     ||--o{ Hardware : "guardião"
+```
+
+---
+
+---
+
 ## Visão Geral
 
 Sistema web para registro e acompanhamento de chamados de suporte a sistemas de software desenvolvidos por uma empresa de contabilidade. Usuários de diferentes áreas (diretores, coordenadores, analistas, desenvolvedores e usuários finais) abrem chamados vinculados a projetos e clientes, que são tratados pela equipe de TI/desenvolvimento.
 
 **Nome do sistema:** Digiana  
-**Logo:** `Dig` + `IA` (com efeito glow neon ciano pulsante) + `na`
+**Logo navbar:** `Abertura de Chamados` (texto simples, classe `header-logo-text`)  
+**Logo tela de login:** a palavra `Login` exibida com efeito glow neon ciano pulsante (classe `login-logo-text .ia-glow`)  
+**Animação CSS `ia-glow`:** ciano pulsante — dark mode `#00f0ff` / light mode `#0090bb` — keyframe `ia-pulse` e `ia-pulse-light` em `base.html`
 
 ---
 
@@ -18,11 +206,14 @@ Sistema web para registro e acompanhamento de chamados de suporte a sistemas de 
 | Camada | Tecnologia | Observação |
 |---|---|---|
 | Framework web | Django 3.2.25 | Projeto nomeado `setup`, app principal `core` |
-| Banco de dados | SQLite (Django ORM) | Arquivo `db.sqlite3` na raiz |
+| Banco de dados | PostgreSQL (produção) / SQLite (dev) | Railway PostgreSQL em produção; SQLite local como fallback |
 | Frontend CSS | Tailwind CSS via CDN | Sem build step (sem Node/webpack) |
 | Tipografia | Inter, Poppins, Montserrat | Google Fonts |
-| Backend Python | Python 3.x | |
-| E-mail | Zoho Mail SMTP | `smtp.zoho.com`, porta 465, SSL |
+| Backend Python | Python 3.11 | Pinado via `.python-version` |
+| E-mail | ConfigurarEmail — múltiplas configs | Suporte a SMTP convencional e API HTTP Brevo (porta 443) |
+| Arquivos estáticos | WhiteNoise | `CompressedManifestStaticFilesStorage`, sem CDN |
+| Mídia persistente | Cloudinary | Avatares, anexos e imagens CKEditor em produção |
+| WSGI / Produção | Gunicorn | 2 workers, timeout 120 s, Railway |
 
 ---
 
@@ -31,39 +222,57 @@ Sistema web para registro e acompanhamento de chamados de suporte a sistemas de 
 ```
 chamados/
 ├── setup/
-│   ├── settings.py          # Configurações Django
-│   ├── urls.py              # Roteamento raiz
+│   ├── settings.py              # Configurações Django
+│   ├── urls.py                  # Roteamento raiz
 │   └── wsgi.py
 ├── core/
-│   ├── models.py            # Modelos de dados
-│   ├── views.py             # Views e lógica de negócio
-│   ├── forms.py             # Formulários Django
-│   ├── urls.py              # URLs do app core
-│   ├── admin.py             # Registro no Django Admin
-│   ├── middleware.py        # ForcePasswordChangeMiddleware
-│   ├── context_processors.py # Injeta user_role em todos os templates
-│   └── migrations/          # 13 migrações
+│   ├── models.py                # 9 modelos de dados
+│   ├── views.py                 # Views e lógica de negócio (~2100 linhas)
+│   ├── forms.py                 # Formulários Django
+│   ├── urls.py                  # URLs do app core
+│   ├── admin.py                 # Registro no Django Admin
+│   ├── middleware.py            # ForcePasswordChangeMiddleware + SecurityHeadersMiddleware
+│   ├── context_processors.py    # Injeta user_role em todos os templates
+│   ├── email_backend.py         # Py312SMTPEmailBackend — compatibilidade Python 3.12
+│   └── migrations/              # 24 migrações (0001–0024)
+│       └── management/
+│           └── commands/
+│               ├── setup_inicial.py  # Cria superusuário inicial (idempotente)
+│               ├── setup_dev.py      # Ambiente local: migrations + fixture
+│               └── seed_base.py      # Seed de Sistema/Cliente/Projeto (get_or_create)
 ├── templates/
-│   ├── base.html            # Layout base com navbar, dark/light mode
+│   ├── base.html                # Layout base com navbar, dark/light mode, hambúrguer
 │   └── core/
-│       ├── login.html
+│       ├── login.html           # Login com banner estático Dark.png/Light.png
 │       ├── cadastro.html
 │       ├── alterar_senha.html
 │       ├── usuarios_list.html
-│       ├── usuario_edit.html        # novo
+│       ├── usuario_edit.html
 │       ├── dashboard.html
-│       ├── chamados_list.html       # novo
+│       ├── chamados_list.html
+│       ├── chamado_detail.html  # ~844 linhas — conversa unificada, badge SLA
+│       ├── chamado_form.html
 │       ├── clientes_list.html
 │       ├── cliente_form.html
 │       ├── projetos_list.html
 │       ├── projeto_form.html
-│       ├── chamado_form.html
-│       ├── chamado_detail.html
 │       ├── sistemas_list.html
 │       ├── sistema_form.html
-│       └── configurar_email.html
+│       ├── configurar_email.html
+│       ├── configurar_email_form.html
+│       ├── relatorios.html      # ITIL 4: MTTR, distribuições, tendências, SLA compliance
+│       ├── sla_list.html
+│       └── sla_form.html
 ├── static/
-├── db.sqlite3
+│   └── img/
+│       ├── Dark.png             # Banner da tela de login (dark mode)
+│       └── Light.png            # Banner da tela de login (light mode)
+├── fixtures_inicial.json        # Dados de dev (não carregar em produção)
+├── CHECKLIST_RAILWAY.md         # Checklist de deploy Railway
+├── Procfile                     # Comando de inicialização Railway
+├── requirements.txt             # 12 dependências com versões exatas
+├── .python-version              # 3.11
+├── db.sqlite3                   # Banco local (não commitar)
 └── manage.py
 ```
 
@@ -122,16 +331,18 @@ class Chamado(models.Model):
 ### Implementação 2 — Identidade Visual Digiana e Dark Mode
 
 **O que foi construído:**
-- Logo "Digiana" com animação CSS: `Dig` + `IA` (glow neon ciano pulsante) + `na`
+- Logo navbar: texto `Abertura de Chamados` (classe `header-logo-text`, fonte Poppins bold)
+- Logo tela de login: palavra `Login` exibida com animação CSS `ia-glow` (glow ciano pulsante)
+- Banner lateral na tela de login: imagens estáticas `static/img/Dark.png` e `static/img/Light.png` trocadas conforme o tema
 - Dark mode como padrão do sistema
-- Light mode opcional com toggle de lâmpada na navbar
+- Light mode opcional com toggle de ícones **lua** (dark) / **sol** (light) na navbar
 - Transição animada entre temas usando a **View Transitions API** (`document.startViewTransition`) com efeito circular ripple a partir do botão
 - Fallback com `clip-path` animado para navegadores sem suporte à API
 
 **Lógica do tema (JavaScript no `<head>` de `base.html`):**
 - Tema salvo em `localStorage` com chave `digiana-theme`
 - Script executa imediatamente (antes do `DOMContentLoaded`) para evitar flash de tema errado
-- Toggle via `<input type="checkbox" id="theme-toggle">` + `<label>` com ícone de lâmpada SVG
+- Toggle via `<input type="checkbox" id="theme-toggle">` + `<label>` com ícones SVG lua/sol
 
 **CSS do glow (em `base.html` `<style>`):**
 
@@ -322,7 +533,7 @@ Todo usuário novo nasce com `must_change_password=True`.
 
 ```python
 class ForcePasswordChangeMiddleware:
-    _EXEMPT = ('/alterar-senha/', '/logout/', '/login/', '/admin/', '/static/')
+    _EXEMPT = ('/alterar-senha/', '/logout/', '/login/', '/painel-adm/', '/static/')
 
     def __call__(self, request):
         if request.user.is_authenticated:
@@ -336,6 +547,8 @@ class ForcePasswordChangeMiddleware:
 ```
 
 Registrado no final do `MIDDLEWARE` em `settings.py`. Intercepta todas as rotas exceto as isentas.
+
+> **`SecurityHeadersMiddleware`** — adicionado posteriormente ao mesmo arquivo `core/middleware.py`. Injeta em toda resposta: `Content-Security-Policy` (CSP com `script-src cdn.tailwindcss.com cdn.ckeditor.com`, `img-src res.cloudinary.com`), `Permissions-Policy` (câmera/microfone/geolocalização desativados) e `X-XSS-Protection: 1; mode=block`. Não possui lista de isenção — aplica-se a todas as respostas.
 
 **3. View e template (`alterar_senha_view` / `alterar_senha.html`):**
 
@@ -2395,14 +2608,15 @@ Classe `Py312SMTPEmailBackend(EmailBackend)` — corrige incompatibilidade do Dj
 
 ### `core/models.py`
 
-Oito modelos:
+Nove modelos:
 
 | Modelo | Campos principais |
 |---|---|
 | `Sistema` | `nome`, `descricao`, `ativo`, `criado_em` |
 | `Cliente` | `nome`, `cpf_cnpj`, `email`, `telefone`, `criado_em` |
 | `Projeto` | `cliente` (FK), `nome`, `descricao`, `criado_em` |
-| `Chamado` | `projeto`, `sistema` (FK, opcional), `titulo`, `descricao`, `status`, `prioridade`, `responsavel`, `observadores` (M2M), `criado_por`, `criado_em`, `atualizado_em`, `fechado_em`, `excluido`, `excluido_em`, `excluido_por` (FK, SET_NULL), `motivo_exclusao` |
+| `SLADefinicao` | `nome`, `descricao`, `prioridade` (unique), `tempo_limite_horas` (FloatField, horas úteis), `cor_classe` (Tailwind), `ativo`, `criado_em`, `atualizado_em` |
+| `Chamado` | `projeto`, `sistema` (FK, opcional), `sla` (FK SLADefinicao, opcional), `titulo`, `descricao`, `status`, `prioridade`, `responsavel`, `observadores` (M2M), `criado_por`, `criado_em`, `atualizado_em`, `fechado_em`, `reaberto_em`, `reaberto_count`, `excluido`, `excluido_em`, `excluido_por` (FK, SET_NULL), `motivo_exclusao` |
 | `PerfilUsuario` | `user` (OneToOne), `role`, `must_change_password`, `cliente` (FK, opcional), `celular`, `whatsapp`, `telefone_fixo`, `email_verificar`, `foto` (ImageField, opcional) |
 | `ConfigurarEmail` | `nome`, `ativo`, `servidor_smtp`, `porta`, `usuario`, `remetente`, `senha`, `use_tls`, `use_ssl`, `usar_api`, `atualizado_em` |
 | `Resposta` | `chamado` (FK), `autor` (FK nullable), `conteudo`, `criado_em`, `resposta_pai` (FK self, nullable) |
@@ -2466,7 +2680,13 @@ Oito modelos:
 | `configurar_email_toggle` | POST | Somente admin — alterna ativo/inativo (toggle iOS-style na lista) |
 | `configurar_email_delete` | POST | Somente admin — exclui configuração SMTP |
 | `testar_email_view` | POST | Somente admin — envia e-mail de teste; retorna JSON `{ok, erro, diagnostico}` |
-| `relatorios_view` | GET | Somente admin — relatórios mensal/anual com métricas ITIL 4 e gráfico de barras |
+| `relatorios_view` | GET | Somente admin — relatórios mensal/anual com métricas ITIL 4: MTTR, distribuições, tendências, SLA compliance |
+| `relatorios_export_csv` | GET | Somente admin — exporta chamados do período como CSV (utf-8-sig, 13 colunas) |
+| `sla_list` | GET | Somente admin — lista SLAs por prioridade (paginado 20/pág) |
+| `sla_create` | GET/POST | Somente admin — cria definição de SLA |
+| `sla_update` | GET/POST | Somente admin — edita SLA existente |
+| `sla_delete` | POST | Somente admin — exclui SLA |
+| `csrf_failure` | GET | Pública — substitui página 403 padrão; redireciona para login com mensagem amigável |
 | `perfil_foto_view` | POST | Autenticado — salva foto em `media/avatares/`; retorna JSON `{ok, url}` |
 | `upload_imagem_view` | POST | Autenticado — `@csrf_exempt`, salva imagem em `media/ckeditor/YYYY/MM/` |
 
@@ -2484,6 +2704,7 @@ Oito modelos:
 | `ObservadorChoiceField` | — | `ModelMultipleChoiceField` com `label_from_instance` usando `_label_usuario()`; queryset: todos os roles, sem superusuário |
 | `ChamadoForm` | `Chamado` | `projeto`, `sistema` (campo explícito, `required=False`, `empty_label='— Nenhum sistema —'`), `titulo`, `descricao`, `status`, `prioridade`, `responsavel` (campo explícito), `observadores` |
 | `SistemaForm` | `Sistema` | `nome`, `descricao`, `ativo` |
+| `SLAForm` | `SLADefinicao` | `nome`, `descricao`, `prioridade`, `tempo_limite_horas`, `cor_classe`, `ativo` |
 | `ConfigurarEmailForm` | `ConfigurarEmail` | `nome`, `usar_api`, `servidor_smtp`, `porta`, `usuario`, `remetente`, `senha`, `use_ssl`, `use_tls` — campo `senha` é `PasswordInput` com `required=False` (em branco mantém senha atual) |
 
 ### `core/urls.py`
@@ -2499,6 +2720,7 @@ Oito modelos:
 /usuarios/                       → usuarios_list
 /usuarios/<pk>/editar/           → usuario_edit
 /usuarios/<pk>/excluir/          → usuario_delete
+/usuarios/<pk>/resetar-senha/    → usuario_reset_senha    (POST)
 
 # Dashboard
 / (raiz)                         → dashboard
@@ -2531,6 +2753,13 @@ Oito modelos:
 
 # Relatórios (admin only)
 /relatorios/                     → relatorios_view
+/relatorios/exportar-csv/        → relatorios_export_csv  (GET, download CSV)
+
+# SLAs (admin only)
+/slas/                           → sla_list
+/slas/novo/                      → sla_create
+/slas/<pk>/editar/               → sla_update
+/slas/<pk>/excluir/              → sla_delete             (POST)
 
 # Configuração de e-mail (admin only)
 /configuracao-email/             → configurar_email_view      (lista)
@@ -2613,6 +2842,8 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 | `0020_alter_configuraremail_senha.py` | Amplia `max_length` do campo `senha` no `ConfigurarEmail` (para acomodar tokens de API Brevo `xkeysib-...`) |
 | `0021_configuraremail_usar_api.py` | Adiciona `usar_api` (BooleanField, default `False`) ao `ConfigurarEmail` — modo API HTTP Brevo sem usar SMTP |
 | `0022_chamado_excluido_chamado_excluido_em_and_more.py` | Adiciona `fechado_em`, `excluido`, `excluido_em`, `excluido_por` (FK), `motivo_exclusao` ao `Chamado`; `RunPython` retroativo para preencher `fechado_em` em chamados já fechados |
+| `0023_auto_20260616_0951.py` | Adiciona `reaberto_em` (DateTimeField nullable) e `reaberto_count` (IntegerField default=0) ao `Chamado` — base para métrica de reincidência nos relatórios |
+| `0024_auto_20260616_1005.py` | Cria modelo `SLADefinicao`; adiciona FK `sla` (SET_NULL, nullable) ao `Chamado` |
 
 ---
 
@@ -2621,20 +2852,24 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 | Link | Admin | Gestor | Dev | Usuário |
 |---|:---:|:---:|:---:|:---:|
 | Dashboard | ✅ | ✅ | ✅ | ✅ |
-| Chamados *(novo)* | ✅ | ✅ | ✅ | ✅ |
+| Chamados | ✅ | ✅ | ✅ | ✅ |
 | Clientes | ✅ | ✅ | ✅ | ❌ |
 | Projetos | ✅ | ✅ | ✅ | ❌ |
-| Sistemas *(borda verde)* | ✅ | ❌ | ❌ | ❌ |
-| Usuários *(borda azul)* | ✅ | ❌ | ❌ | ❌ |
-| ⚙ E-mail SMTP *(borda âmbar)* | ✅ | ❌ | ❌ | ❌ |
+| Sistemas *(borda verde tracejada)* | ✅ | ❌ | ❌ | ❌ |
+| Usuários *(borda azul tracejada)* | ✅ | ❌ | ❌ | ❌ |
+| ⚙ E-mail SMTP *(borda âmbar tracejada)* | ✅ | ❌ | ❌ | ❌ |
+
+> **Relatórios e SLAs não estão na navbar.** O acesso é feito por botões pill dedicados no dashboard (admin only), posicionados acima dos cards de métricas. Isso evita overflow na navbar com 8+ itens admin.
 
 **Link ativo:** o item correspondente à página atual recebe `bg-slate-700 text-white`. Sub-páginas (editar, detalhar, criar) ativam o item pai correspondente via `request.resolver_match.url_name`.
+
+**Nav breakpoint:** `xl` (1280px) — abaixo disso o hambúrguer (`btn-hamburger`) exibe o menu vertical com os mesmos links e condicionais de role.
 
 ---
 
 ## Decisões de Arquitetura
 
-**Por que não usar PostgreSQL?** O SQLite do Django é suficiente para o volume interno esperado e elimina dependência de servidor de banco de dados. Pode ser migrado futuramente alterando apenas o `DATABASES` em `settings.py`.
+**Por que PostgreSQL em produção e SQLite em dev?** O deploy no Railway usa PostgreSQL (serviço separado via `DATABASE_URL`), que garante persistência entre redeploys, concorrência sem lock e compatibilidade com o ecossistema Railway. Em desenvolvimento local, o fallback para SQLite elimina a necessidade de instalar PostgreSQL na máquina do dev. A lógica de banco em `settings.py` detecta automaticamente o ambiente (via `DATABASE_URL` → `PGHOST` → SQLite).
 
 **Por que Tailwind via CDN sem build?** Reduz complexidade de setup. O projeto não exige tree-shaking agressivo; o CDN gera as classes sob demanda em tempo de execução no browser.
 
@@ -3715,8 +3950,7 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 **Templates novos:** sla_list.html, sla_form.html
 
 **Templates alterados:**
-- base.html: link SLAs na navbar
-- dashboard.html: botão elegante ao lado de "Ver Relatórios"
+- dashboard.html: botão pill "Gestão de SLAs" ao lado de "Ver Relatórios" (admin only) — link para `/slas/`; SLAs **não** foi adicionado ao navbar (evita overflow — breakpoint `xl` já estava no limite)
 - chamado_detail.html: badge SLA (🟢 Dentro / 🟡 Próximo / 🔴 Violado)
 - relatorios.html: card SLA Compliance (grid 5 colunas)
 
@@ -3734,4 +3968,887 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 | 6 | Reincidência (Chamados Reabertos) | ✅ |
 | 7 | Exportação CSV | ✅ |
 | 8 | SLAs (Acordos de Nível de Serviço) | ✅ |
+
+---
+
+---
+
+## Estudo — Extensão para Atendimento de Hardware (Sistemas/Hardware)
+
+**Data do estudo:** 2026-06-16  
+**Status:** Planejado — não implementado  
+**Motivação:** O menu "Sistemas" cobre exclusivamente sistemas de software. A equipe também realiza atendimento de ativos físicos (hardware), cujo ciclo de vida, rastreabilidade e histórico de chamados não têm suporte na aplicação atual.
+
+---
+
+### Diagnóstico do Estado Atual
+
+#### O que o modelo `Sistema` representa hoje
+
+```python
+class Sistema(models.Model):
+    nome      = models.CharField(max_length=150)
+    descricao = models.TextField(blank=True, null=True)
+    ativo     = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+```
+
+É um catálogo simples de **aplicações/plataformas de software**. Vinculado ao `Chamado` via FK opcional (`null=True, blank=True`). Gerenciado exclusivamente pelo admin (`diretor_ti`).
+
+#### Por que não reutilizar `Sistema` para hardware
+
+Hardware possui atributos estruturalmente diferentes de software:
+
+| Atributo | Software | Hardware |
+|---|:---:|:---:|
+| Nome / Descrição | ✅ | ✅ |
+| Ativo/Inativo | ✅ | ✅ (com mais estados) |
+| Categoria (desktop, servidor, impressora…) | ❌ | ✅ |
+| Fabricante / Modelo | ❌ | ✅ |
+| Número de série | ❌ | ✅ |
+| Número de patrimônio (asset tag) | ❌ | ✅ |
+| Localização física | ❌ | ✅ |
+| Responsável / Guardião | ❌ | ✅ |
+| Data de aquisição | ❌ | ✅ |
+| Garantia (válida até) | ❌ | ✅ |
+| Valor de aquisição | ❌ | ✅ |
+| Cliente / Empresa dona | ❌ | ✅ |
+
+Misturar hardware e software no mesmo modelo introduziria dezenas de campos nullable para o lado errado. A decisão correta é um **modelo `Hardware` separado**.
+
+---
+
+### Arquitetura Proposta
+
+#### Visão geral da extensão
+
+```
+Digiana (estado atual)          Digiana (após extensão)
+──────────────────────          ──────────────────────────────
+Sistema (software)              Sistema (software) — inalterado
+Chamado → sistema (FK opt.)     Chamado → sistema (FK opt.) — inalterado
+                                Chamado → hardware (FK opt.) — NOVO
+                                Chamado.tipo (software/hardware/geral) — NOVO
+                                Hardware (modelo completo) — NOVO
+```
+
+Todas as adições são **retrocompatíveis**: campos nullable, nenhum registro existente é afetado.
+
+---
+
+### Modelo `Hardware` — Especificação Completa
+
+**Arquivo:** `core/models.py` — inserir após `Sistema`, antes de `Cliente`
+
+```python
+class Hardware(models.Model):
+    CATEGORIA_CHOICES = [
+        ('desktop',    'Desktop / PC'),
+        ('notebook',   'Notebook'),
+        ('servidor',   'Servidor'),
+        ('impressora', 'Impressora'),
+        ('monitor',    'Monitor'),
+        ('nobreak',    'Nobreak / UPS'),
+        ('switch',     'Switch'),
+        ('roteador',   'Roteador / Firewall'),
+        ('telefone',   'Telefone / VoIP'),
+        ('tablet',     'Tablet'),
+        ('celular',    'Celular Corporativo'),
+        ('periferico', 'Periférico'),
+        ('outro',      'Outro'),
+    ]
+
+    STATUS_CHOICES = [
+        ('operacional', 'Operacional'),
+        ('manutencao',  'Em Manutenção'),
+        ('reserva',     'Em Reserva'),
+        ('desativado',  'Desativado'),
+        ('extraviado',  'Extraviado'),
+    ]
+
+    # ── Identificação ──────────────────────────────────────────────────
+    nome         = models.CharField(max_length=150, verbose_name='Nome / Descrição')
+    categoria    = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, verbose_name='Categoria')
+    fabricante   = models.CharField(max_length=100, blank=True, null=True, verbose_name='Fabricante')
+    modelo       = models.CharField(max_length=100, blank=True, null=True, verbose_name='Modelo')
+    numero_serie = models.CharField(
+        max_length=100, blank=True, null=True, unique=True,
+        verbose_name='Número de Série',
+        help_text='Único por ativo; NULL permitido para ativos sem número de série.'
+    )
+    patrimonio   = models.CharField(
+        max_length=50, blank=True, null=True, unique=True,
+        verbose_name='Patrimônio (Asset Tag)',
+        help_text='Código interno de inventário físico.'
+    )
+
+    # ── Localização e responsabilidade ─────────────────────────────────
+    localizacao = models.CharField(
+        max_length=150, blank=True, null=True,
+        verbose_name='Localização',
+        help_text='Ex.: "Sala 201", "Rack A3", "Home-office João".'
+    )
+    responsavel = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='hardware_sob_guarda',
+        verbose_name='Responsável / Guardião',
+        help_text='Usuário que tem a posse física do ativo.'
+    )
+    cliente = models.ForeignKey(
+        'Cliente', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='hardware',
+        verbose_name='Cliente / Empresa',
+        help_text='Empresa a quem o ativo pertence.'
+    )
+
+    # ── Ciclo de vida ──────────────────────────────────────────────────
+    data_aquisicao  = models.DateField(blank=True, null=True, verbose_name='Data de Aquisição')
+    garantia_ate    = models.DateField(
+        blank=True, null=True, verbose_name='Garantia válida até',
+        help_text='Data de expiração da garantia do fabricante.'
+    )
+    valor_aquisicao = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True,
+        verbose_name='Valor de Aquisição (R$)'
+    )
+
+    # ── Estado operacional ─────────────────────────────────────────────
+    status      = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='operacional',
+        verbose_name='Status'
+    )
+    observacoes = models.TextField(blank=True, null=True, verbose_name='Observações')
+
+    # ── Auditoria ──────────────────────────────────────────────────────
+    criado_em     = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Hardware'
+        verbose_name_plural = 'Hardware'
+        ordering = ['categoria', 'nome']
+
+    def __str__(self):
+        fab = f' — {self.fabricante}' if self.fabricante else ''
+        mod = f' {self.modelo}' if self.modelo else ''
+        return f'{self.get_categoria_display()}: {self.nome}{fab}{mod}'
+
+    @property
+    def garantia_vencida(self):
+        from django.utils import timezone
+        if not self.garantia_ate:
+            return None
+        return self.garantia_ate < timezone.now().date()
+
+    @property
+    def garantia_vencendo_em_dias(self):
+        from django.utils import timezone
+        if not self.garantia_ate:
+            return None
+        delta = (self.garantia_ate - timezone.now().date()).days
+        return delta  # negativo se já venceu
+```
+
+**Propriedades calculadas:**
+- `garantia_vencida` → `True/False/None` — usada nos templates para badge de alerta
+- `garantia_vencendo_em_dias` → int — dias restantes (negativo = vencido) — usado nos alertas do dashboard
+
+---
+
+### Mudanças no modelo `Chamado`
+
+**Dois campos novos, ambos nullable — zero impacto em registros existentes:**
+
+```python
+# FK para o ativo de hardware afetado pelo chamado
+hardware = models.ForeignKey(
+    'Hardware', on_delete=models.SET_NULL,
+    null=True, blank=True,
+    related_name='chamados',
+    verbose_name='Hardware Afetado'
+)
+
+# Classificação do chamado por domínio
+TIPO_CHOICES = [
+    ('software',  'Software'),
+    ('hardware',  'Hardware'),
+    ('geral',     'Geral'),
+]
+tipo = models.CharField(
+    max_length=20, choices=TIPO_CHOICES, default='geral',
+    verbose_name='Tipo'
+)
+```
+
+**Combinações válidas de um chamado após a extensão:**
+
+| Cenário | `tipo` | `sistema` | `hardware` |
+|---|---|:---:|:---:|
+| Bug em sistema de software | `software` | ✅ | ❌ |
+| Impressora com defeito | `hardware` | ❌ | ✅ |
+| Dúvida ou solicitação geral | `geral` | ❌ | ❌ |
+| Erro de software no servidor X | `software` | ✅ | ✅ |
+| Sistema lento — possível hardware | `geral` | ✅ | ✅ |
+
+---
+
+### Migrações
+
+| Arquivo | Operações |
+|---|---|
+| `0025_hardware.py` | `CreateModel Hardware` — cria tabela `core_hardware` com todos os campos acima |
+| `0026_chamado_hardware_tipo.py` | `AddField hardware` (FK nullable) + `AddField tipo` (CharField default `'geral'`) no `Chamado`; `RunPython` para classificar retroativamente chamados que têm `sistema` setado como `tipo='software'` |
+
+**Data migration retroativa sugerida em `0026`:**
+
+```python
+def classificar_chamados_existentes(apps, schema_editor):
+    Chamado = apps.get_model('core', 'Chamado')
+    # Chamados com sistema setado → provavelmente software
+    Chamado.objects.filter(sistema__isnull=False, tipo='geral').update(tipo='software')
+```
+
+---
+
+### Forms
+
+#### `HardwareForm` (novo em `core/forms.py`)
+
+```python
+class HardwareForm(forms.ModelForm):
+    class Meta:
+        model  = Hardware
+        fields = [
+            'nome', 'categoria', 'fabricante', 'modelo',
+            'numero_serie', 'patrimonio', 'localizacao',
+            'responsavel', 'cliente',
+            'data_aquisicao', 'garantia_ate', 'valor_aquisicao',
+            'status', 'observacoes',
+        ]
+        widgets = {
+            'data_aquisicao': forms.DateInput(attrs={'type': 'date'}),
+            'garantia_ate':   forms.DateInput(attrs={'type': 'date'}),
+            'observacoes':    forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Responsável: apenas usuários com perfil (não superusuário)
+        self.fields['responsavel'].queryset = (
+            User.objects.filter(is_superuser=False)
+            .select_related('perfil')
+            .order_by('first_name', 'username')
+        )
+        self.fields['responsavel'].required = False
+        self.fields['cliente'].required     = False
+```
+
+#### `ChamadoForm` — campos novos
+
+```python
+# Adicionados a fields:
+fields = [
+    'projeto', 'sistema', 'hardware', 'tipo',   # hardware e tipo são novos
+    'titulo', 'descricao', 'status', 'prioridade', 'responsavel', 'observadores'
+]
+
+# Queryset hardware: apenas ativos operacionais ou em manutenção
+hardware = forms.ModelChoiceField(
+    queryset=Hardware.objects.filter(
+        status__in=['operacional', 'manutencao']
+    ).order_by('categoria', 'nome'),
+    required=False,
+    empty_label='— Nenhum hardware afetado —',
+)
+```
+
+**Lógica de exibição condicional no template `chamado_form.html`:**
+- Quando `tipo = 'software'`: exibe seletor de `sistema`, oculta `hardware`
+- Quando `tipo = 'hardware'`: exibe seletor de `hardware`, oculta `sistema`
+- Quando `tipo = 'geral'`: oculta ambos
+- Implementado via JavaScript no template com `addEventListener` no select de tipo
+
+---
+
+### Views
+
+#### Novas views em `core/views.py`
+
+| View | Método | Proteção | Descrição |
+|---|---|---|---|
+| `hardware_list` | GET | Admin + Dev | Lista todos os ativos com filtros por categoria/status/cliente; paginada 20/pág |
+| `hardware_create` | GET/POST | Admin | Cadastra novo ativo de hardware |
+| `hardware_detail` | GET | Admin + Dev | Ficha completa do ativo + histórico de chamados vinculados |
+| `hardware_update` | GET/POST | Admin + Dev | Edita ativo existente |
+| `hardware_delete` | POST | Admin | Soft delete ou exclusão real (sem chamados vinculados) |
+
+**`hardware_list` — lógica de filtros e alertas:**
+
+```python
+@login_required(login_url='login')
+def hardware_list(request):
+    role = _role(request.user)
+    if role not in ('admin', 'dev'):
+        return redirect('dashboard')
+
+    qs = Hardware.objects.select_related('responsavel', 'cliente').order_by('categoria', 'nome')
+
+    # Filtros
+    categoria_f = request.GET.get('categoria', '')
+    status_f    = request.GET.get('status', '')
+    cliente_f   = request.GET.get('cliente', '')
+    q           = request.GET.get('q', '').strip()
+
+    if categoria_f: qs = qs.filter(categoria=categoria_f)
+    if status_f:    qs = qs.filter(status=status_f)
+    if cliente_f:   qs = qs.filter(cliente_id=cliente_f)
+    if q:
+        qs = qs.filter(
+            Q(nome__icontains=q)       |
+            Q(fabricante__icontains=q) |
+            Q(modelo__icontains=q)     |
+            Q(numero_serie__icontains=q) |
+            Q(patrimonio__icontains=q)
+        )
+
+    # Alerta de garantias vencendo em 30 dias
+    from django.utils import timezone
+    hoje = timezone.now().date()
+    prazo_alerta = hoje + timedelta(days=30)
+    garantias_alerta = Hardware.objects.filter(
+        garantia_ate__isnull=False,
+        garantia_ate__lte=prazo_alerta,
+        status__in=['operacional', 'manutencao', 'reserva']
+    ).order_by('garantia_ate')
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'core/hardware_list.html', {
+        'hardware':          page_obj,
+        'page_obj':          page_obj,
+        'garantias_alerta':  garantias_alerta,
+        'categoria_choices': Hardware.CATEGORIA_CHOICES,
+        'status_choices':    Hardware.STATUS_CHOICES,
+        'clientes':          Cliente.objects.all().order_by('nome'),
+        'categoria_filter':  categoria_f,
+        'status_filter':     status_f,
+        'cliente_filter':    cliente_f,
+        'q':                 q,
+    })
+```
+
+**`hardware_detail` — contexto:**
+
+```python
+@login_required(login_url='login')
+def hardware_detail(request, pk):
+    role = _role(request.user)
+    if role not in ('admin', 'dev'):
+        return redirect('dashboard')
+
+    hw = get_object_or_404(Hardware, pk=pk)
+
+    # Chamados vinculados (excluindo soft-deleted)
+    chamados_hw = (
+        Chamado.objects.filter(hardware=hw, excluido=False)
+        .select_related('projeto__cliente', 'responsavel', 'criado_por')
+        .order_by('-criado_em')
+    )
+
+    from django.utils import timezone
+    hoje = timezone.now().date()
+
+    return render(request, 'core/hardware_detail.html', {
+        'hw':          hw,
+        'chamados_hw': chamados_hw,
+        'hoje':        hoje,
+        'garantia_dias': hw.garantia_vencendo_em_dias,
+    })
+```
+
+---
+
+### URLs
+
+**Adições em `core/urls.py`:**
+
+```python
+# Hardware
+path('hardware/',                     views.hardware_list,   name='hardware_list'),
+path('hardware/novo/',                views.hardware_create, name='hardware_create'),
+path('hardware/<int:pk>/',            views.hardware_detail, name='hardware_detail'),
+path('hardware/<int:pk>/editar/',     views.hardware_update, name='hardware_update'),
+path('hardware/<int:pk>/excluir/',    views.hardware_delete, name='hardware_delete'),
+```
+
+---
+
+### Templates
+
+#### `hardware_list.html` — estrutura
+
+```
+┌─ Inventário de Hardware ─────────────────────────────────────────────┐
+│  [Alerta: N ativos com garantia vencendo em 30 dias]   [+ Novo]     │
+│                                                                       │
+│  [Busca] [Categoria ▾] [Status ▾] [Cliente ▾] [Limpar]              │
+│                                                                       │
+│  ┌─ Tabela ────────────────────────────────────────────────────────┐ │
+│  │ Categoria | Nome/Modelo | Série/Patrimônio | Local | Resp. | ... │ │
+│  │ 🖥 Desktop | Dell Insp... | SN-12345 / P001 | Sala 201 | João  │ │
+│  │ 🖨 Impress. | HP M402    | SN-67890 / P002 | Recep. | Maria │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│  Página 1 de 3 · 48 ativos                          [‹] [1][2][3] [›] │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Badges de status:**
+
+| Status | Cor Tailwind |
+|---|---|
+| Operacional | `bg-emerald-100 text-emerald-700` |
+| Em Manutenção | `bg-amber-100 text-amber-700` |
+| Em Reserva | `bg-blue-100 text-blue-700` |
+| Desativado | `bg-slate-100 text-slate-500` |
+| Extraviado | `bg-rose-100 text-rose-700` |
+
+**Badge de garantia:**
+
+| Situação | Badge |
+|---|---|
+| Garantia válida (> 30 dias) | `bg-emerald-50 text-emerald-600` com data |
+| Vencendo em ≤ 30 dias | `bg-amber-50 text-amber-600` com ícone ⚠ |
+| Garantia vencida | `bg-rose-50 text-rose-600` com ícone ✕ |
+| Sem garantia cadastrada | `text-slate-400` em itálico |
+
+#### `hardware_detail.html` — estrutura
+
+```
+┌─ [Ícone categoria] Dell Inspiron 15 3520 ──────────────────────────────────┐
+│  🟢 Operacional    Sala 201    Responsável: João Silva    Cliente: Odonton  │
+│                                                                              │
+│  ┌─ Dados do Ativo ──────────────────┐  ┌─ Ciclo de Vida ────────────────┐ │
+│  │ Fabricante: Dell                  │  │ Adquirido: 15/03/2024          │ │
+│  │ Modelo: Inspiron 15 3520          │  │ Garantia: 15/03/2026 🟡 87d   │ │
+│  │ Série: 8XKJP43                    │  │ Valor: R$ 3.200,00             │ │
+│  │ Patrimônio: P-0042                │  └────────────────────────────────┘ │
+│  │ Localização: Sala 201 — Mesa 3    │                                      │
+│  └───────────────────────────────────┘                                      │
+│                                                                              │
+│  ┌─ Histórico de Chamados (4) ─────────────────────────────────────────┐   │
+│  │ #47 — Teclado sem funcionar    🔴 Alta    Aberto    02/06/2026      │   │
+│  │ #31 — Lentidão no sistema      🟡 Média   Fechado   10/05/2026      │   │
+│  │ #18 — Atualização de SO        🟢 Baixa   Fechado   20/04/2026      │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### `chamado_form.html` — extensão para tipo/hardware
+
+Adicionar após o campo `sistema`, com lógica JS:
+
+```html
+<!-- Seletor de tipo -->
+<div>
+    <label class="block text-sm font-semibold ...">Tipo de Chamado</label>
+    <select name="tipo" id="id_tipo" class="...">
+        <option value="geral">Geral</option>
+        <option value="software">Software</option>
+        <option value="hardware">Hardware</option>
+    </select>
+</div>
+
+<!-- Sistema — visível apenas quando tipo = software -->
+<div id="bloco-sistema" class="hidden">
+    {{ form.sistema }}
+</div>
+
+<!-- Hardware — visível apenas quando tipo = hardware -->
+<div id="bloco-hardware" class="hidden">
+    {{ form.hardware }}
+</div>
+
+<script>
+(function () {
+    var sel    = document.getElementById('id_tipo');
+    var bSist  = document.getElementById('bloco-sistema');
+    var bHw    = document.getElementById('bloco-hardware');
+
+    function atualizar() {
+        bSist.classList.toggle('hidden', sel.value !== 'software');
+        bHw.classList.toggle('hidden',   sel.value !== 'hardware');
+    }
+
+    sel.addEventListener('change', atualizar);
+    atualizar();  // aplica no carregamento (modo edição)
+})();
+</script>
+```
+
+#### `chamado_detail.html` — painel lateral, adição
+
+```html
+<!-- Seção hardware no painel de metadados -->
+{% if chamado.hardware %}
+<div class="pt-3 border-t border-slate-100">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Hardware</p>
+    <a href="{% url 'hardware_detail' chamado.hardware.pk %}"
+       class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline">
+        <span>{{ chamado.hardware.get_categoria_display }}</span>
+        <span>{{ chamado.hardware.nome }}</span>
+    </a>
+    {% if chamado.hardware.numero_serie %}
+    <p class="text-xs text-slate-400 mt-0.5">Série: {{ chamado.hardware.numero_serie }}</p>
+    {% endif %}
+    {% if chamado.hardware.localizacao %}
+    <p class="text-xs text-slate-400">Local: {{ chamado.hardware.localizacao }}</p>
+    {% endif %}
+</div>
+{% endif %}
+```
+
+#### `chamados_list.html` — coluna e filtro de tipo
+
+- Nova coluna "Tipo" com badge colorido:
+  - `software` → `bg-blue-50 text-blue-700`
+  - `hardware` → `bg-orange-50 text-orange-700`
+  - `geral` → `bg-slate-50 text-slate-500`
+- Novo `<select>` de tipo na barra de filtros, ao lado do filtro de status
+
+---
+
+### Navegação — `base.html`
+
+**Nav desktop e menu mobile — adição do link Hardware:**
+
+```html
+{% if user_role == 'admin' or user_role == 'dev' %}
+<a href="{% url 'hardware_list' %}"
+   class="px-2.5 py-1.5 rounded-md text-sm font-medium transition whitespace-nowrap border border-dashed
+          {% if url_name == 'hardware_list' or url_name == 'hardware_create' or url_name == 'hardware_detail' or url_name == 'hardware_update' %}
+              bg-slate-700 text-white border-orange-500/60
+          {% else %}
+              text-slate-300 hover:text-white hover:bg-slate-800 border-orange-500/30 hover:border-orange-500/60
+          {% endif %}">Hardware</a>
+{% endif %}
+```
+
+**Posicionamento:** após "Sistemas", antes de "Usuários". Visível para `admin` e `dev` (diferente de "Sistemas" que é admin-only).
+
+**Cor de destaque:** laranja (`border-orange-500`) — diferencia visualmente de Sistemas (verde) e Usuários (azul).
+
+---
+
+### Dashboard — extensão
+
+#### Novos cards de métricas
+
+**Três novos cards de hardware** adicionados ao grid de métricas:
+
+| Card | Dado | Gradiente |
+|---|---|---|
+| Chamados Hardware | `Chamado.objects.filter(tipo='hardware', excluido=False, status__in=['aberto','em_progresso','pendente'])` | `from-orange-500 to-amber-600` |
+| Ativos em Manutenção | `Hardware.objects.filter(status='manutencao').count()` | `from-rose-500 to-red-700` |
+| Garantias Vencendo | `Hardware.objects.filter(garantia_ate__lte=hoje+30d).count()` | `from-yellow-400 to-amber-500` |
+
+**Alerta de garantia no topo do dashboard** (admin/dev):
+
+```html
+{% if garantias_vencendo %}
+<div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-3">
+    <svg ...>⚠</svg>
+    <div>
+        <strong>{{ garantias_vencendo|length }} ativo(s) com garantia vencendo em 30 dias:</strong>
+        {% for hw in garantias_vencendo %}
+            <a href="{% url 'hardware_detail' hw.pk %}">{{ hw.nome }}</a>
+            ({{ hw.garantia_ate|date:"d/m/Y" }}){% if not forloop.last %}, {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+```
+
+**`dashboard_stats` (API JSON) — campos novos:**
+
+```python
+return JsonResponse({
+    ...dados existentes...,
+    'chamados_hardware': Chamado.objects.filter(
+        tipo='hardware', excluido=False,
+        status__in=['aberto', 'em_progresso', 'pendente']
+    ).count(),
+    'hardware_manutencao': Hardware.objects.filter(status='manutencao').count(),
+})
+```
+
+---
+
+### Relatórios — extensão
+
+**Novas seções na `relatorios_view`:**
+
+#### Chamados por Tipo
+
+```python
+por_tipo = {}
+for t, label in Chamado.TIPO_CHOICES:
+    por_tipo[t] = {
+        'label':    label,
+        'criados':  criados_qs.filter(tipo=t).count(),
+        'fechados': fechados_qs.filter(tipo=t).count(),
+    }
+```
+
+Template: 3 cards lado a lado (software/hardware/geral) com barras de resolução.
+
+#### Ativos Mais Problemáticos (Top 10)
+
+```python
+from django.db.models import Count
+
+top_hw = (
+    Hardware.objects
+    .filter(chamados__excluido=False, chamados__criado_em__range=(inicio, fim))
+    .annotate(total_chamados=Count('chamados'))
+    .order_by('-total_chamados')[:10]
+)
+```
+
+Template: tabela com ativo, categoria, total de chamados, status atual — vincula ao `hardware_detail`.
+
+#### MTTR por Tipo
+
+```python
+# Calculado separadamente para software e hardware
+for tipo in ['software', 'hardware', 'geral']:
+    fechados_tipo = fechados_qs.filter(tipo=tipo)
+    horas = [_horas_uteis(c.criado_em, c.fechado_em) for c in fechados_tipo if c.fechado_em]
+    mttr_por_tipo[tipo] = {
+        'media': sum(horas) / len(horas) if horas else 0,
+        'count': len(horas),
+    }
+```
+
+#### Snapshot de Inventário
+
+```python
+inventario = {
+    'total':         Hardware.objects.count(),
+    'operacional':   Hardware.objects.filter(status='operacional').count(),
+    'manutencao':    Hardware.objects.filter(status='manutencao').count(),
+    'desativado':    Hardware.objects.filter(status='desativado').count(),
+    'por_categoria': Hardware.objects.values('categoria').annotate(
+                         total=Count('id')).order_by('-total'),
+    'garantia_vencida':   Hardware.objects.filter(
+                              garantia_ate__lt=hoje, status='operacional').count(),
+    'garantia_vencendo':  Hardware.objects.filter(
+                              garantia_ate__range=(hoje, hoje + timedelta(30))).count(),
+}
+```
+
+---
+
+### RBAC — Análise de Impacto
+
+Nenhum role existente é alterado. As novas permissões se encaixam na matriz existente:
+
+| Ação | Admin | Dev | Gestor | Usuário |
+|---|:---:|:---:|:---:|:---:|
+| Ver lista de Hardware | ✅ | ✅ | ❌ | ❌ |
+| Cadastrar Hardware | ✅ | ❌ | ❌ | ❌ |
+| Editar Hardware | ✅ | ✅ | ❌ | ❌ |
+| Excluir Hardware | ✅ | ❌ | ❌ | ❌ |
+| Abrir chamado tipo hardware | ✅ | ✅ | ✅ | ✅ |
+| Vincular hardware a chamado | ✅ | ✅ | ❌ | ❌ |
+| Ver detalhe do hardware | ✅ | ✅ | ❌ | ❌ |
+| Ver cards de hardware no dashboard | ✅ | ✅ | ❌ | ❌ |
+| Ver alerta de garantia | ✅ | ✅ | ❌ | ❌ |
+| Exportar CSV de hardware | ✅ | ❌ | ❌ | ❌ |
+
+**Justificativas:**
+- Cadastro restrito ao admin: hardware representa patrimônio da empresa — apenas admin autoriza entradas no inventário
+- Edição acessível ao dev: o técnico que atende o chamado pode atualizar localização e status do ativo durante o atendimento
+- Exclusão admin only: equivalente ao padrão adotado em Clientes, Projetos e Sistemas
+- Abertura de chamado tipo hardware: qualquer usuário pode abrir — o campo `hardware` (seletor) só aparece para admin/dev
+
+---
+
+### Avaliação de Risco
+
+| Área | Risco | Justificativa |
+|---|---|---|
+| `core/models.py` — campos novos em `Chamado` | **Zero** | `null=True, blank=True, default='geral'` — nenhum dado existente afetado |
+| `core/models.py` — modelo `Hardware` novo | **Zero** | Nova tabela independente |
+| Migrações | **Baixo** | `AddField` nullable + `CreateModel` — operações seguras no PostgreSQL |
+| `ChamadoForm` | **Baixo** | Campo novo opcional; formulário existente continua funcional |
+| Dashboard | **Baixo** | Cards adicionais; cards existentes inalterados |
+| Navbar | **Baixo** | Link novo; links existentes inalterados |
+| Performance | **Baixo** | Adicionar `select_related('hardware')` nos querysets existentes |
+| `chamados_list` | **Baixo** | Coluna nova + filtro novo; paginação e RBAC inalterados |
+
+---
+
+### Fases de Implementação
+
+| Fase | Escopo | Arquivos afetados | Migrações |
+|---|---|---|---|
+| **1 — Inventário** | Modelo `Hardware` + CRUD completo + nav link | `models.py`, `views.py`, `forms.py`, `urls.py`, `base.html`, 3 templates novos | `0025` |
+| **2 — Integração com Chamados** | FK `hardware` + `tipo` em `Chamado`; form/detail/list atualizados | `models.py`, `views.py`, `forms.py`, `chamado_form.html`, `chamado_detail.html`, `chamados_list.html` | `0026` |
+| **3 — Dashboard** | Cards hardware + alertas de garantia + polling em tempo real | `views.py` (dashboard, dashboard_stats), `dashboard.html` | — |
+| **4 — Relatórios** | Métricas por tipo + top ativos + MTTR split + inventário snapshot | `views.py` (relatorios_view, relatorios_export_csv), `relatorios.html` | — |
+
+**Cada fase é independente e deployável separadamente.** A Fase 1 entrega valor imediato (inventário consultável) mesmo sem chamados vinculados.
+
+---
+
+### Decisões de Arquitetura — Hardware
+
+**Por que modelo `Hardware` separado e não estender `Sistema`?** Hardware e software têm atributos estruturalmente diferentes. Número de série, patrimônio, localização física, garantia e valor de aquisição não fazem sentido para software. Misturar os dois no mesmo modelo criaria dezenas de campos `null=True` em todos os registros de software — violação da Primeira Forma Normal. A separação mantém cada modelo coeso e evita lógica condicional desnecessária em formulários e templates.
+
+**Por que `tipo` como campo do `Chamado` e não derivar do que está preenchido (sistema vs hardware)?** Um chamado `geral` não teria nem sistema nem hardware setados — seria impossível distinguir "não classificado" de "intencional". Além disso, um chamado pode ter tanto `sistema` quanto `hardware` setados simultaneamente (ex.: "sistema travando neste servidor específico"). O campo `tipo` é a intenção do solicitante; `sistema` e `hardware` são os vínculos técnicos. As duas informações são complementares, não redundantes.
+
+**Por que `garantia_vencendo_em_dias` como property e não campo calculado no banco?** A data de referência ("hoje") muda a cada dia. Armazenar o número de dias restantes no banco exigiria atualização diária de todos os registros — operação de manutenção desnecessária. A property calcula sob demanda com `timezone.now().date()`, que é barato (operação local, sem I/O). O filtro de alertas usa consultas diretas por `garantia_ate` (indexável) — sem property.
+
+**Por que `admin` cadastra e `dev` edita hardware?** O cadastro representa a entrada formal de um ativo no inventário patrimonial — ato administrativo que exige autorização. A edição inclui atualização de localização e status durante atendimento, que é operacional e cabe ao técnico (`dev`). A distinção segue o princípio de menor privilégio: cada role faz exatamente o que seu trabalho exige.
+
+**Por que o link "Hardware" na navbar é visível para `dev` além do `admin`?** O técnico (`dev`) precisa consultar o inventário para identificar o ativo afetado ao atender um chamado. Restringir a visibilidade ao admin criaria fricção no fluxo de atendimento — o técnico precisaria pedir ao admin para verificar um número de série ou localização. O inventário é leitura + edição para `dev`; o cadastro e exclusão continuam restritos ao `admin`.
+
+**Por que alertas de garantia com 30 dias de antecedência?** Garantias de hardware normalmente exigem providências (renovação de contrato, solicitação de reparo, aquisição de substituto) com antecedência mínima de semanas. 30 dias é o prazo padrão da indústria para processos de compra/contratação em empresas de médio porte. O valor pode ser tornado configurável em uma iteração futura via `settings.py` ou campo em `ConfigurarEmail`-like model.
+
+---
+
+### Estado do Estudo
+
+| Item | Status |
+|---|---|
+| Análise do estado atual | ✅ Concluído |
+| Modelo `Hardware` — especificação | ✅ Concluído |
+| Mudanças em `Chamado` | ✅ Concluído |
+| Migrações | ✅ Especificadas |
+| Forms | ✅ Especificados |
+| Views — especificação | ✅ Concluído |
+| URLs | ✅ Especificadas |
+| Templates — wireframes | ✅ Concluído |
+| Navegação | ✅ Especificada |
+| Dashboard | ✅ Especificado |
+| Relatórios | ✅ Especificados |
+| RBAC | ✅ Analisado |
+| Avaliação de risco | ✅ Concluído |
+| **Implementação** | ⏳ Pendente |
+
+---
+
+## Estudo — Verificação de Domínio no Brevo (anagma.com.br)
+
+**Data do estudo:** 2026-06-18
+**Status:** Pendente — aguardando acesso ao painel DNS do domínio
+
+### Contexto
+
+O envio de e-mails via Brevo API HTTP já funciona em produção (Railway). Porém, e-mails com remetente `@anagma.com.br` não chegam às caixas do próprio domínio (Zoho Mail) porque o domínio `anagma.com.br` ainda não está verificado/autenticado no Brevo. O Zoho rejeita ou classifica como spam e-mails cujo remetente declara ser `@anagma.com.br` mas o SPF/DKIM não confirma que o Brevo estava autorizado a enviá-los.
+
+---
+
+### Registros DNS fornecidos pelo Brevo
+
+O painel Brevo → Remetentes, Domínios e IPs → Autenticar `anagma.com.br` exibe os seguintes registros a adicionar no DNS do domínio:
+
+#### 1. Código Brevo (TXT) — prova de posse do domínio
+
+| Campo | Valor |
+|---|---|
+| Tipo | `TXT` |
+| Nome | `@` (ou `anagma.com.br` ou em branco — depende do provedor) |
+| Valor | `brevo-code:5aac68a3b9da779f0228d900e908de52` |
+
+**Para que serve:** Prova ao Brevo que o cadastrante é dono do domínio. Sem essa verificação o Brevo não libera o envio por `@anagma.com.br`.
+
+#### 2. DKIM 1 (CNAME) — assinatura digital do remetente
+
+| Campo | Valor |
+|---|---|
+| Tipo | `CNAME` |
+| Nome | `brevo1._domainkey` |
+| Valor | `b1.anagma-com-br.dkim.brevo.com` |
+
+#### 3. DKIM 2 (CNAME) — assinatura digital do remetente (redundância)
+
+| Campo | Valor |
+|---|---|
+| Tipo | `CNAME` |
+| Nome | `brevo2._domainkey` |
+| Valor | `b2.anagma-com-br.dkim.brevo.com` |
+
+**Para que serve (DKIM 1 e 2):** Assina digitalmente cada e-mail enviado pelo Brevo em nome de `anagma.com.br`. O servidor de destino (Zoho) verifica esses registros para confirmar que o Brevo estava autorizado. Sem DKIM o e-mail cai em spam ou é rejeitado.
+
+#### 4. DMARC (TXT) — política de autenticação
+
+| Campo | Valor |
+|---|---|
+| Tipo | `TXT` |
+| Nome | `_dmarc` |
+| Valor | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` |
+
+**Para que serve:** Define o que o servidor de destino faz quando um e-mail falha SPF/DKIM. `p=none` = somente monitorar, não bloquear — modo mais seguro para começar. Os relatórios de falha são enviados ao Brevo via `rua=`.
+
+---
+
+### Fluxo de e-mail após a verificação
+
+```
+Digiana (Railway) → Brevo API HTTP (porta 443)
+                          ↓
+                    Brevo assina com DKIM
+                          ↓
+                    Servidor Zoho (anagma.com.br)
+                          ↓
+                    Zoho verifica:
+                      1. DKIM válido? (CNAME brevo1/brevo2._domainkey) ✅
+                      2. DMARC autoriza? (_dmarc TXT) ✅
+                          ↓
+                    E-mail entregue na caixa
+```
+
+---
+
+### Onde adicionar os registros
+
+O DNS de `anagma.com.br` pode estar em dois lugares:
+
+| Lugar | O que é |
+|---|---|
+| **Registro.br** (`registro.br`) | Registrador obrigatório para domínios `.com.br` — login com CPF/CNPJ do titular |
+| **Provedor DNS delegado** | Se os nameservers do domínio apontam para Cloudflare, Locaweb, UOL Host etc., os registros são adicionados lá, não no Registro.br |
+
+**Como descobrir onde o DNS está:**
+1. Acessar `registro.br` → logar com CPF/CNPJ do titular
+2. Abrir `anagma.com.br` → aba DNS
+3. Verificar os **servidores de nome** (`ns1.xxx`, `ns2.xxx`):
+   - Se forem do Registro.br → configurar ali mesmo
+   - Se forem de outro provedor → logar nesse provedor e adicionar os registros lá
+
+---
+
+### Passos para concluir quando o acesso ao DNS estiver disponível
+
+1. Identificar onde o DNS do `anagma.com.br` está gerenciado (Registro.br ou provedor delegado)
+2. Adicionar os 4 registros exatamente como descritos acima
+3. Aguardar propagação (geralmente minutos, até 48h em casos extremos)
+4. Clicar em **"Verificar"** no painel Brevo → Remetentes, Domínios e IPs
+5. Testar envio pelo painel do Digiana (Configurações de E-mail → Enviar Teste)
+
+---
+
+### Estado do Estudo
+
+| Item | Status |
+|---|---|
+| Identificação do problema (SPF/DKIM ausente) | ✅ Concluído |
+| Registros DNS obtidos no painel Brevo | ✅ Concluído |
+| Entendimento do fluxo de autenticação | ✅ Concluído |
+| Acesso ao painel DNS do `anagma.com.br` | ⏳ Pendente |
+| Adição dos registros no DNS | ⏳ Pendente |
+| Verificação no Brevo | ⏳ Pendente |
+| Teste de envio para `@anagma.com.br` | ⏳ Pendente |
 
