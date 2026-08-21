@@ -198,6 +198,7 @@ Sistema web para registro e acompanhamento de chamados de suporte a sistemas de 
 **Logo navbar:** `Abertura de Chamados` (texto simples, classe `header-logo-text`)  
 **Logo tela de login:** a palavra `Login` exibida com efeito glow neon ciano pulsante (classe `login-logo-text .ia-glow`)  
 **Animação CSS `ia-glow`:** ciano pulsante — dark mode `#00f0ff` / light mode `#0090bb` — keyframe `ia-pulse` e `ia-pulse-light` em `base.html`
+**Ambiente atual:** o sistema já está em produção no Railway; os commits atualizam o código local e o repositório, e o deploy depende do `push` para o branch configurado.
 
 ---
 

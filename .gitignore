@@ -53,6 +53,7 @@ static_root/
 .DS_Store
 Thumbs.db
 
+
 # Cobertura de testes
 .coverage
 .coverage.*
@@ -74,3 +75,4 @@ dmypy.json
 
 # Windows
 desktop.ini
+zorin.md
