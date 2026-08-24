@@ -192,13 +192,32 @@ class ClienteForm(forms.ModelForm):
         raise forms.ValidationError('Informe um CPF válido (11 dígitos) ou CNPJ válido (14 dígitos).')
 
 class ProjetoForm(forms.ModelForm):
+    responsavel_lider = forms.ModelChoiceField(
+        queryset=User.objects.filter(is_active=True).order_by('first_name', 'username'),
+        required=False,
+        label="Líder / Responsável",
+        empty_label="— Selecione o Responsável —",
+        widget=forms.Select(attrs={'class': 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300'})
+    )
+
     class Meta:
         model = Projeto
-        fields = ['cliente', 'nome', 'descricao']
+        fields = [
+            'cliente', 'sistema', 'nome', 'descricao',
+            'status_macro', 'prioridade', 'responsavel_lider',
+            'data_inicio', 'data_previsao_entrega', 'data_conclusao'
+        ]
+        _W = 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300'
         widgets = {
-            'cliente': forms.Select(attrs={'class': 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300'}),
-            'nome': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300'}),
-            'descricao': forms.Textarea(attrs={'class': 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300', 'rows': 4}),
+            'cliente': forms.Select(attrs={'class': _W}),
+            'sistema': forms.Select(attrs={'class': _W}),
+            'nome': forms.TextInput(attrs={'class': _W, 'placeholder': 'Nome do Projeto'}),
+            'descricao': forms.Textarea(attrs={'class': _W, 'rows': 4, 'placeholder': 'Descrição e objetivos do projeto...'}),
+            'status_macro': forms.Select(attrs={'class': _W}),
+            'prioridade': forms.Select(attrs={'class': _W}),
+            'data_inicio': forms.DateInput(attrs={'class': _W, 'type': 'date'}),
+            'data_previsao_entrega': forms.DateInput(attrs={'class': _W, 'type': 'date'}),
+            'data_conclusao': forms.DateInput(attrs={'class': _W, 'type': 'date'}),
         }
 
 _ROLE_LABEL = {

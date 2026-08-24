@@ -23,8 +23,10 @@ urlpatterns = [
     path('clientes/<int:pk>/editar/', views.cliente_update, name='cliente_update'),
     path('clientes/<int:pk>/excluir/', views.cliente_delete, name='cliente_delete'),
 
-    # Projetos
+    # Projetos & Kanban
     path('projetos/', views.projetos_list, name='projetos_list'),
+    path('projetos/kanban/', views.projetos_kanban, name='projetos_kanban'),
+    path('projetos/kanban/mover/', views.projeto_mover_kanban, name='projeto_mover_kanban'),
     path('projetos/novo/', views.projeto_create, name='projeto_create'),
     path('projetos/<int:pk>/editar/', views.projeto_update, name='projeto_update'),
     path('projetos/<int:pk>/excluir/', views.projeto_delete, name='projeto_delete'),

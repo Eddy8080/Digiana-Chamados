@@ -458,6 +458,13 @@ li p{margin:0}
 <a href="#onde-adicionar-os-registros" class="toc-l3" style="padding-left:28px" title="Onde adicionar os registros">Onde adicionar os registros</a>
 <a href="#passos-para-concluir-quando-o-acesso-ao-dns-estiver-disponivel" class="toc-l3" style="padding-left:28px" title="Passos para concluir quando o acesso ao DNS estiver disponível">Passos para concluir quando o acesso ao DNS estiver disponível</a>
 <a href="#estado-do-estudo" class="toc-l3" style="padding-left:28px" title="Estado do Estudo">Estado do Estudo</a>
+<div class="toc-section-label">CONTAINERIZAÇÃO & VPS</div>
+<a href="#estudo-arquitetura-de-containerizacao-e-deploy-docker-para-vps" class="toc-l2" style="padding-left:14px" title="Estudo — Arquitetura de Containerização e Deploy Docker para VPS">Estudo — Arquitetura de Containerização e Deploy Docker para VPS</a>
+<a href="#contexto-e-motivacao-docker" class="toc-l3" style="padding-left:28px" title="Contexto e Motivação">Contexto e Motivação</a>
+<a href="#diagnostico-do-estado-atual-vs-padrao-recomendado" class="toc-l3" style="padding-left:28px" title="Diagnóstico do Estado Atual vs. Padrão Recomendado">Diagnóstico do Estado Atual vs. Padrão Recomendado</a>
+<a href="#principios-de-otimizacao-aplicados" class="toc-l3" style="padding-left:28px" title="Princípios de Otimização Aplicados">Princípios de Otimização Aplicados</a>
+<a href="#arquitetura-de-arquivos-proposta-para-a-vps" class="toc-l3" style="padding-left:28px" title="Arquitetura de Arquivos Proposta para a VPS">Arquitetura de Arquivos Proposta para a VPS</a>
+<a href="#roteiro-de-deploy-em-vps-passo-a-passo" class="toc-l3" style="padding-left:28px" title="Roteiro de Deploy em VPS (Passo a Passo)">Roteiro de Deploy em VPS (Passo a Passo)</a>
   </div>
 </nav>
 <!-- ── Topbar ──────────────────────────────────────────────────────────── -->
@@ -6480,6 +6487,233 @@ for tipo in [&#x27;software&#x27;, &#x27;hardware&#x27;, &#x27;geral&#x27;]:
 <td>⏳ Pendente</td>
 </tr>
 </tbody></table></div>
+
+<hr>
+
+<h2 id="estudo-arquitetura-de-containerizacao-e-deploy-docker-para-vps">Estudo — Arquitetura de Containerização e Deploy Docker para VPS</h2>
+
+<h3 id="contexto-e-motivacao-docker">Contexto e Motivação</h3>
+<p>Atualmente, o projeto <code>Digiana-Chamados</code> utiliza build baseado em <strong>Nixpacks/Procfile</strong> voltado a plataformas PaaS (como Railway). Para viabilizar a migração ou deploy autônomo em servidores dedicados/VPS (ex: DigitalOcean, Hetzner, AWS EC2, Linode ou VPS própria Linux), é essencial estruturar uma <strong>containerização profissional com Docker</strong>, seguindo as melhores práticas de engenharia de software (Multi-stage build, segurança com non-root user, imagens enxutas e healthchecks nativos).</p>
+
+<hr>
+
+<h3 id="diagnostico-do-estado-atual-vs-padrao-recomendado">Diagnóstico do Estado Atual vs. Padrão Recomendado</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Componente</th>
+<th>Estado Atual (Railway/Nixpacks)</th>
+<th>Padrão Alvo Docker (VPS)</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>Definição de Imagem</strong></td>
+<td><code>nixpacks.toml</code> / <code>Procfile</code></td>
+<td><code>Dockerfile</code> com Multi-stage build</td>
+</tr>
+<tr>
+<td><strong>Tamanho Estimado</strong></td>
+<td>~1 GB a 1.4 GB (imagem genérica/runtime completo)</td>
+<td>~150 MB a 200 MB (Python Slim otimizado)</td>
+</tr>
+<tr>
+<td><strong>Segurança do Container</strong></td>
+<td>Usuário root padrão</td>
+<td>Usuário restrito sem privilégios (<code>appuser:appgroup</code>)</td>
+</tr>
+<tr>
+<td><strong>Camadas de Cache</strong></td>
+<td>Automático via Nixpack</td>
+<td>Cópia granular de dependências (<code>requirements.txt</code>) antes do código</td>
+</tr>
+<tr>
+<td><strong>Orquestração</strong></td>
+<td>PaaS Cloud</td>
+<td><code>docker-compose.yml</code> (App + PostgreSQL + Nginx + Certbot)</td>
+</tr>
+<tr>
+<td><strong>Monitoramento de Saúde</strong></td>
+<td>Check HTTP externo PaaS</td>
+<td><code>HEALTHCHECK</code> nativo dentro do container</td>
+</tr>
+<tr>
+<td><strong>Arquivos Ignorados</strong></td>
+<td>Apenas <code>.gitignore</code></td>
+<td><code>.dockerignore</code> dedicado evitando cache local e segredos</td>
+</tr>
+</tbody></table></div>
+
+<hr>
+
+<h3 id="principios-de-otimizacao-aplicados">Princípios de Otimização Aplicados</h3>
+<ol>
+<li><strong>Separação clara entre Build e Runtime (Multi-stage build):</strong>
+  <ul>
+    <li><strong>Stage 1 (Builder):</strong> Instala compiladores, headers e ferramentas C (<code>gcc</code>, <code>libpq-dev</code>, <code>python-dev</code>) para compilar dependências Python (<em>wheels</em>).</li>
+    <li><strong>Stage 2 (Runtime Final):</strong> Utiliza imagem base mínima (ex.: <code>python:3.11-slim</code>), copia apenas as <em>wheels</em> compiladas e pacotes de runtime (<code>libpq</code>), descartando ferramentas de compilação desnecessárias.</li>
+  </ul>
+</li>
+<li><strong>Aproveitamento Máximo do Cache de Camadas (<em>Layer Caching</em>):</strong>
+  <p>O arquivo <code>requirements.txt</code> é copiado e instalado antes de copiar o código-fonte. Assim, alterações de regras de negócio ou templates não invalidam o cache das bibliotecas Python.</p>
+</li>
+<li><strong>Execução Segura com Usuário Não-Root (<code>non-root user</code>):</strong>
+  <p>Criação de usuário de sistema com UID/GID fixo para rodar a aplicação, prevenindo escalada de privilégios em caso de vulnerabilidades na aplicação.</p>
+</li>
+<li><strong>Resiliência com <code>HEALTHCHECK</code>:</strong>
+  <p>Instrução nativa no container consultando endpoint de ping/health via <code>curl</code>, permitindo auto-recuperação pelo Docker Daemon ou orquestrador.</p>
+</li>
+</ol>
+
+<hr>
+
+<h3 id="arquitetura-de-arquivos-proposta-para-a-vps">Arquitetura de Arquivos Proposta para a VPS</h3>
+
+<h4>1. <code>.dockerignore</code></h4>
+<pre><code class="language-dockerignore">.git
+.gitignore
+.env
+.venv
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.antigravitycli/
+.gemini/
+*.sqlite3
+media/
+staticfiles/
+node_modules/
+image.png
+chamados.html
+chamados.md
+</code></pre>
+
+<h4>2. <code>Dockerfile</code> (Otimizado / Multi-Stage)</h4>
+<pre><code class="language-dockerfile"># ── STAGE 1: Builder (Compilação e Wheels) ───────────────────────────
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Instala ferramentas necessárias para compilar pacotes C/Postgres
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache de dependências
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# ── STAGE 2: Runtime (Imagem Final de Produção Enxuta) ───────────────
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
+
+# Dependências mínimas de runtime e curl para HEALTHCHECK
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cria usuário não-privilegiado
+RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000 appuser
+
+# Instala as rodas pré-compiladas do builder
+COPY --from=builder /app/wheels /wheels
+COPY requirements.txt .
+RUN pip install --no-cache /wheels/* && rm -rf /wheels
+
+# Copia o código-fonte da aplicação
+COPY . .
+
+# Cria pastas necessárias e define permissões
+RUN mkdir -p /app/staticfiles /app/media && \
+    chown -R appuser:appgroup /app
+
+USER appuser
+
+EXPOSE 8000
+
+# Healthcheck interno do container
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/login/ || exit 1
+
+# Inicialização com migrações e WSGI Gunicorn
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn setup.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]
+</code></pre>
+
+<h4>3. <code>docker-compose.yml</code> (Produção na VPS)</h4>
+<pre><code class="language-yaml">version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: digiana_chamados_app
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15-alpine
+    container_name: digiana_chamados_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-digiana_db}
+      POSTGRES_USER: ${POSTGRES_USER:-digiana_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-segredo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-digiana_user} -d ${POSTGRES_DB:-digiana_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+</code></pre>
+
+<hr>
+
+<h3 id="roteiro-de-deploy-em-vps-passo-a-passo">Roteiro de Deploy em VPS (Passo a Passo)</h3>
+<ol>
+<li><strong>Provisionamento da VPS:</strong>
+  <p>Instalação do Docker Engine e Docker Compose Plugin (<code>sudo apt install docker.io docker-compose-plugin</code>).</p>
+</li>
+<li><strong>Configuração de Firewall (UFW):</strong>
+  <p>Liberar portas SSH (<code>22</code>), HTTP (<code>80</code>) e HTTPS (<code>443</code>).</p>
+</li>
+<li><strong>Clonagem do Repositório e <code>.env</code>:</strong>
+  <p>Clonar via Git (<code>git clone ...</code>) e criar arquivo <code>.env</code> de produção com as credenciais seguras (<code>SECRET_KEY</code>, <code>POSTGRES_*</code>, <code>BREVO_API_KEY</code>).</p>
+</li>
+<li><strong>Reverse Proxy (Nginx + SSL Certbot):</strong>
+  <p>Configurar o Nginx da VPS para receber o tráfego da porta <code>443</code> com SSL Let's Encrypt e fazer proxy reverso para <code>http://127.0.0.1:8000</code>.</p>
+</li>
+<li><strong>Subida dos Containers:</strong>
+  <p><code>docker compose up -d --build</code></p>
+</li>
+<li><strong>Rotina de Backup dos Volumes:</strong>
+  <p>Cronjob diário executando <code>pg_dump</code> no container do Postgres e sincronizando a pasta <code>media_volume</code> com armazenamento em nuvem (Google Drive / S3).</p>
+</li>
+</ol>
 
 </div>
 

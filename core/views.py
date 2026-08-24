@@ -229,6 +229,18 @@ def dashboard(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Projetos em destaque para visão executiva da diretoria
+    if role == 'usuario':
+        try:
+            cli = request.user.perfil.cliente
+            projetos_sprint = Projeto.objects.filter(cliente=cli, status_macro__in=['sprint', 'em_construcao', 'homologacao'])
+        except PerfilUsuario.DoesNotExist:
+            projetos_sprint = Projeto.objects.none()
+    else:
+        projetos_sprint = Projeto.objects.filter(status_macro__in=['sprint', 'em_construcao', 'homologacao'])
+    
+    projetos_sprint = projetos_sprint.select_related('cliente', 'sistema', 'responsavel_lider').prefetch_related('chamados').order_by('ordem_posicao', '-criado_em')[:4]
+
     context = {
         'chamados':        page_obj,
         'page_obj':        page_obj,
@@ -238,6 +250,7 @@ def dashboard(request):
         'pendentes':       pendentes,
         'resolvidos':      resolvidos,
         'fechados':        fechados,
+        'projetos_sprint': projetos_sprint,
         'user_role':       _role(request.user),
     }
     return render(request, 'core/dashboard.html', context)
@@ -900,6 +913,108 @@ def projeto_delete(request, pk):
     projeto.delete()
     messages.success(request, f"Projeto '{nome}' e todos os seus chamados foram excluídos.")
     return redirect('projetos_list')
+
+
+@login_required(login_url='login')
+def projetos_kanban(request):
+    """Painel Executivo / Kanban de Projetos & Sistemas para Diretoria e Gestão."""
+    role = _role(request.user)
+    
+    # Filtro base por perfil (cliente vê apenas seus projetos)
+    if role == 'usuario':
+        try:
+            cli = request.user.perfil.cliente
+            qs = Projeto.objects.filter(cliente=cli)
+        except PerfilUsuario.DoesNotExist:
+            qs = Projeto.objects.none()
+    else:
+        qs = Projeto.objects.all()
+
+    # Filtros opcionais via GET
+    cliente_id = request.GET.get('cliente')
+    sistema_id = request.GET.get('sistema')
+    responsavel_id = request.GET.get('responsavel')
+    busca = request.GET.get('busca')
+
+    if cliente_id:
+        qs = qs.filter(cliente_id=cliente_id)
+    if sistema_id:
+        qs = qs.filter(sistema_id=sistema_id)
+    if responsavel_id:
+        qs = qs.filter(responsavel_lider_id=responsavel_id)
+    if busca:
+        qs = qs.filter(Q(nome__icontains=busca) | Q(descricao__icontains=busca))
+
+    qs = qs.select_related('cliente', 'sistema', 'responsavel_lider').prefetch_related('chamados').order_by('ordem_posicao', '-criado_em')
+
+    # Agrupamento pelas 5 colunas do Kanban
+    colunas = {
+        'backlog': {'titulo': 'Backlog Geral', 'icone': 'clipboard-document-list', 'cor': 'slate', 'projetos': []},
+        'sprint': {'titulo': 'Sprint Atual', 'icone': 'bolt', 'cor': 'blue', 'projetos': []},
+        'em_construcao': {'titulo': 'Em Construção', 'icone': 'wrench-screwdriver', 'cor': 'amber', 'projetos': []},
+        'homologacao': {'titulo': 'Homologação / Testes', 'icone': 'beaker', 'cor': 'purple', 'projetos': []},
+        'concluido': {'titulo': 'Em Produção / Concluído', 'icone': 'check-badge', 'cor': 'emerald', 'projetos': []},
+    }
+
+    for p in qs:
+        st = p.status_macro if p.status_macro in colunas else 'backlog'
+        colunas[st]['projetos'].append(p)
+
+    clientes = Cliente.objects.all().order_by('nome') if role != 'usuario' else []
+    sistemas = Sistema.objects.filter(ativo=True).order_by('nome')
+    responsaveis = User.objects.filter(is_active=True).order_by('first_name', 'username')
+
+    # Métricas executivas para o topo
+    total_projetos = qs.count()
+    projetos_concluidos = len(colunas['concluido']['projetos'])
+    taxa_conclusao = round((projetos_concluidos / total_projetos * 100), 1) if total_projetos > 0 else 0
+
+    return render(request, 'core/projetos_kanban.html', {
+        'colunas': colunas,
+        'clientes': clientes,
+        'sistemas': sistemas,
+        'responsaveis': responsaveis,
+        'total_projetos': total_projetos,
+        'taxa_conclusao': taxa_conclusao,
+        'cliente_id': cliente_id,
+        'sistema_id': sistema_id,
+        'responsavel_id': responsavel_id,
+        'busca': busca or '',
+        'user_role': role,
+    })
+
+
+@csrf_exempt
+@login_required(login_url='login')
+def projeto_mover_kanban(request):
+    """Endpoint AJAX para atualizar a coluna (status_macro) e ordem de um projeto."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método não permitido.'}, status=405)
+    
+    role = _role(request.user)
+    if role == 'usuario':
+        return JsonResponse({'success': False, 'error': 'Permissão negada.'}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        projeto_id = data.get('projeto_id')
+        novo_status = data.get('novo_status')
+        nova_ordem = data.get('nova_ordem', 0)
+
+        projeto = get_object_or_404(Projeto, pk=projeto_id)
+        if novo_status in dict(Projeto.STATUS_CHOICES):
+            projeto.status_macro = novo_status
+            projeto.ordem_posicao = int(nova_ordem)
+            if novo_status == 'concluido' and not projeto.data_conclusao:
+                projeto.data_conclusao = timezone.now().date()
+            projeto.save()
+            return JsonResponse({'success': True, 'msg': f"Projeto '{projeto.nome}' movido com sucesso!"})
+        else:
+            return JsonResponse({'success': False, 'error': 'Status inválido.'}, status=400)
+    except Exception as e:
+        logger.exception("Erro ao mover projeto no Kanban")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 def disparar_email(assunto, mensagem, destinatarios):

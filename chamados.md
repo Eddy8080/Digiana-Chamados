@@ -4856,3 +4856,187 @@ O DNS de `anagma.com.br` pode estar em dois lugares:
 | Adição dos registros no DNS | ⏳ Pendente |
 | Verificação no Brevo | ⏳ Pendente |
 | Teste de envio para `@anagma.com.br` | ⏳ Pendente |
+
+---
+
+## Estudo — Arquitetura de Containerização e Deploy Docker para VPS
+
+### Contexto e Motivação
+Atualmente, o projeto `Digiana-Chamados` utiliza build baseado em **Nixpacks/Procfile** voltado a plataformas PaaS (como Railway). Para viabilizar a migração ou deploy autônomo em servidores dedicados/VPS (ex: DigitalOcean, Hetzner, AWS EC2, Linode, VPS própria Linux), é essencial estruturar uma **containerização profissional com Docker**, seguindo as melhores práticas de engenharia de software (Multi-stage build, segurança com non-root user, imagens enxutas e healthchecks).
+
+---
+
+### Diagnóstico do Estado Atual vs. Padrão Recomendado
+
+| Componente | Estado Atual (Railway/Nixpacks) | Padrão Alvo Docker (VPS) |
+|---|---|---|
+| **Definição de Imagem** | `nixpacks.toml` / `Procfile` | `Dockerfile` com Multi-stage build |
+| **Tamanho Estimado** | ~1 GB a 1.4 GB (imagem genérica/runtime completo) | ~150 MB a 200 MB (Python Alpine / Slim otimizado) |
+| **Segurança do Container** | Usuário root padrão | Usuário restrito sem privilégios (`appuser:appgroup`) |
+| **Camadas de Cache** | Automático via Nixpack | Cópia granular de dependências (`requirements.txt`) antes do código |
+| **Orquestração** | PaaS Cloud | `docker-compose.yml` (App + PostgreSQL + Nginx + Certbot) |
+| **Monitoramento de Saúde** | Check HTTP externo PaaS | `HEALTHCHECK` nativo dentro do container |
+| **Arquivos Ignorados** | Apenas `.gitignore` | `.dockerignore` dedicado evitando cache local e segredos |
+
+---
+
+### Princípios de Otimização Aplicados
+
+1. **Separação clara entre Build e Runtime (Multi-stage build):**
+   - **Stage 1 (Builder):** Instala compiladores, headers e ferramentas C (`gcc`, `libpq-dev`, `python-dev`) para compilar dependências Python (*wheels*).
+   - **Stage 2 (Runtime Final):** Utiliza imagem base mínima (ex.: `python:3.11-slim`), copia apenas as *wheels* compiladas e pacotes de runtime (`libpq`), descartando ferramentas de compilação desnecessárias.
+2. **Aproveitamento Máximo do Cache de Camadas (*Layer Caching*):**
+   - O arquivo `requirements.txt` é copiado e instalado antes de copiar o código-fonte. Assim, alterações de regras de negócio ou templates não invalidam o cache das bibliotecas Python.
+3. **Execução Segura com Usuário Não-Root (`non-root user`):**
+   - Criação de usuário de sistema com UID/GID fixo para rodar a aplicação, prevenindo escalada de privilégios em caso de vulnerabilidades na aplicação.
+4. **Resiliência com `HEALTHCHECK`:**
+   - Instrução nativa no container consultando endpoint de ping/health via `curl`, permitindo auto-recuperação pelo Docker Daemon ou orquestrador.
+
+---
+
+### Arquitetura de Arquivos Proposta para a VPS
+
+#### 1. `.dockerignore`
+```dockerignore
+.git
+.gitignore
+.env
+.venv
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.antigravitycli/
+.gemini/
+*.sqlite3
+media/
+staticfiles/
+node_modules/
+image.png
+chamados.html
+chamados.md
+```
+
+#### 2. `Dockerfile` (Otimizado / Multi-Stage)
+```dockerfile
+# ── STAGE 1: Builder (Compilação e Wheels) ───────────────────────────
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Instala ferramentas necessárias para compilar pacotes C/Postgres
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache de dependências
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# ── STAGE 2: Runtime (Imagem Final de Produção Enxuta) ───────────────
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
+
+# Dependências mínimas de runtime e curl para HEALTHCHECK
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cria usuário não-privilegiado
+RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000 appuser
+
+# Instala as rodas pré-compiladas do builder
+COPY --from=builder /app/wheels /wheels
+COPY requirements.txt .
+RUN pip install --no-cache /wheels/* && rm -rf /wheels
+
+# Copia o código-fonte da aplicação
+COPY . .
+
+# Cria pastas necessárias e define permissões
+RUN mkdir -p /app/staticfiles /app/media && \
+    chown -R appuser:appgroup /app
+
+USER appuser
+
+EXPOSE 8000
+
+# Healthcheck interno do container
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/login/ || exit 1
+
+# Inicialização com migrações e WSGI Gunicorn
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn setup.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]
+```
+
+#### 3. `docker-compose.yml` (Produção na VPS)
+```yaml
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: digiana_chamados_app
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15-alpine
+    container_name: digiana_chamados_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-digiana_db}
+      POSTGRES_USER: ${POSTGRES_USER:-digiana_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-segredo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-digiana_user} -d ${POSTGRES_DB:-digiana_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+```
+
+---
+
+### Roteiro de Deploy em VPS (Passo a Passo)
+
+1. **Provisionamento da VPS:**
+   - Instalação do Docker Engine e Docker Compose Plugin (`sudo apt install docker.io docker-compose-plugin`).
+2. **Configuração de Firewall (UFW):**
+   - Liberar portas SSH (`22`), HTTP (`80`) e HTTPS (`443`).
+3. **Clonagem do Repositório e `.env`:**
+   - Clonar via Git (`git clone ...`).
+   - Criar arquivo `.env` de produção com as credenciais seguras (`SECRET_KEY`, `POSTGRES_*`, `BREVO_API_KEY`).
+4. **Reverse Proxy (Nginx + SSL Certbot):**
+   - Configurar o Nginx da VPS para receber o tráfego da porta `443` com SSL Let's Encrypt e fazer proxy reverso para `http://127.0.0.1:8000`.
+5. **Subida dos Containers:**
+   - `docker compose up -d --build`
+6. **Rotina de Backup dos Volumes:**
+   - Cronjob diário executando `pg_dump` no container do Postgres e sincronizando a pasta `media_volume` com armazenamento em nuvem (ex: Google Drive / S3).

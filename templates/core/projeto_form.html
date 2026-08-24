@@ -9,21 +9,68 @@
 
         <form method="POST" class="space-y-5">
             {% csrf_token %}
-            {% for field in form %}
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}
-                <p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>
-                {% endif %}
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.nome.label }}</label>
+                    {{ form.nome }}
+                    {% if form.nome.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.nome.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.cliente.label }}</label>
+                    {{ form.cliente }}
+                    {% if form.cliente.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.cliente.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.sistema.label }}</label>
+                    {{ form.sistema }}
+                    {% if form.sistema.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.sistema.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.status_macro.label }}</label>
+                    {{ form.status_macro }}
+                    {% if form.status_macro.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.status_macro.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.prioridade.label }}</label>
+                    {{ form.prioridade }}
+                    {% if form.prioridade.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.prioridade.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.responsavel_lider.label }}</label>
+                    {{ form.responsavel_lider }}
+                    {% if form.responsavel_lider.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.responsavel_lider.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.descricao.label }}</label>
+                    {{ form.descricao }}
+                    {% if form.descricao.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.descricao.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.data_inicio.label }}</label>
+                    {{ form.data_inicio }}
+                    {% if form.data_inicio.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.data_inicio.errors.as_text }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">{{ form.data_previsao_entrega.label }}</label>
+                    {{ form.data_previsao_entrega }}
+                    {% if form.data_previsao_entrega.errors %}<p class="text-xs text-rose-500 mt-1">{{ form.data_previsao_entrega.errors.as_text }}</p>{% endif %}
+                </div>
             </div>
-            {% endfor %}
 
             <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                <a href="{% url 'projetos_list' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
+                <a href="{% url 'projetos_kanban' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
                     Cancelar
                 </a>
-                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/10 transition">
+                <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20 transition">
                     Salvar Projeto
                 </button>
             </div>

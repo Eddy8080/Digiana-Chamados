@@ -1,0 +1,556 @@
+{% extends 'base.html' %}
+
+{% block title %}Kanban Executivo de Projetos - Digiana{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ── Estilos Dark Mode (Padrão) para o Kanban ─────────────────────── */
+    .kanban-col-bg {
+        background-color: #1a1a1c !important;
+        border-color: #2a2a2e !important;
+    }
+    .kanban-card-bg {
+        background-color: #232326 !important;
+        border-color: #333338 !important;
+    }
+    .kanban-card-bg:hover {
+        border-color: #6366f1 !important;
+        background-color: #26262a !important;
+    }
+    .kanban-card-inner {
+        background-color: #1a1a1d !important;
+        border-color: #2d2d32 !important;
+    }
+    .kanban-progress-track {
+        background-color: #2d2d32 !important;
+    }
+    .kanban-placeholder-box {
+        border-color: #2e2e34 !important;
+        color: #71717a !important;
+    }
+    .kanban-count-badge {
+        background-color: #26262a !important;
+        border-color: #383840 !important;
+        color: #cbd5e1 !important;
+    }
+
+    /* ── Estilos Light Mode ───────────────────────────────────────────── */
+    html.light-mode .kanban-col-bg {
+        background-color: #f1f5f9 !important;
+        border-color: #e2e8f0 !important;
+    }
+    html.light-mode .kanban-card-bg {
+        background-color: #ffffff !important;
+        border-color: #e2e8f0 !important;
+    }
+    html.light-mode .kanban-card-bg:hover {
+        border-color: #6366f1 !important;
+        background-color: #ffffff !important;
+    }
+    html.light-mode .kanban-card-inner {
+        background-color: #f8fafc !important;
+        border-color: #e2e8f0 !important;
+    }
+    html.light-mode .kanban-progress-track {
+        background-color: #e2e8f0 !important;
+    }
+    html.light-mode .kanban-placeholder-box {
+        border-color: #cbd5e1 !important;
+        color: #94a3b8 !important;
+    }
+    html.light-mode .kanban-count-badge {
+        background-color: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        color: #475569 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-[1600px] mx-auto px-2 sm:px-4 py-4 space-y-6">
+
+    <!-- ── Topo: Cabeçalho & Ações Rápidas ──────────────────────────────── -->
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600/10 flex items-center justify-center text-indigo-600 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd" d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm4.5 1.5a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5h-9Zm0 4.5a.75.75 0 0 0 0 1.5h9a.75.75 0 0 0 0-1.5h-9Zm0 4.5a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5h-5Z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight truncate">Kanban Executivo de Projetos & Sistemas</h1>
+                    <p class="text-xs text-slate-500 truncate">Acompanhamento do ciclo de vida, sprints e evolução dos chamados em tempo real.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Indicadores & Botões de Ação (Linha Única) -->
+        <div class="flex items-center gap-3 shrink-0">
+            <div class="hidden md:flex items-center gap-4 px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                <div class="text-center">
+                    <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+                    <span id="stat-total-projetos" class="text-sm font-bold text-slate-700 dark:text-slate-200">{{ total_projetos }}</span>
+                </div>
+                <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                <div class="text-center">
+                    <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Conclusão</span>
+                    <span id="stat-taxa-conclusao" class="text-sm font-bold text-emerald-600 dark:text-emerald-400">{{ taxa_conclusao }}%</span>
+                </div>
+            </div>
+
+            <!-- Botão Guia do Fluxo -->
+            <button type="button" id="btn-open-guide"
+                    class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm whitespace-nowrap transition">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-indigo-500 shrink-0">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+                </svg>
+                <span>Como Funciona?</span>
+            </button>
+
+            {% if user_role == 'admin' or user_role == 'gestor' %}
+            <a href="{% url 'projeto_create' %}" class="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-600/20 whitespace-nowrap transition">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0">
+                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                <span>Novo Projeto</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── Filtros Executivos ─────────────────────────────────────────────── -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <!-- Busca -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar Projeto</label>
+                <input type="text" name="busca" value="{{ busca }}" placeholder="Nome ou palavra-chave..."
+                       class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+            </div>
+
+            <!-- Cliente -->
+            {% if user_role != 'usuario' %}
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente</label>
+                <select name="cliente" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    <option value="">Todos os Clientes</option>
+                    {% for c in clientes %}
+                    <option value="{{ c.id }}" {% if cliente_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <!-- Sistema -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Sistema</label>
+                <select name="sistema" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    <option value="">Todos os Sistemas</option>
+                    {% for s in sistemas %}
+                    <option value="{{ s.id }}" {% if sistema_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Responsável -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Líder / Responsável</label>
+                <select name="responsavel" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    <option value="">Todos os Responsáveis</option>
+                    {% for r in responsaveis %}
+                    <option value="{{ r.id }}" {% if responsavel_id == r.id|stringformat:"s" %}selected{% endif %}>{{ r.get_full_name|default:r.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botões Filtrar / Limpar -->
+            <div class="flex items-end gap-2">
+                <button type="submit" class="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-xl transition">
+                    Filtrar
+                </button>
+                <a href="{% url 'projetos_kanban' %}" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold rounded-xl transition text-center" title="Limpar Filtros">
+                    ✕
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Quadro Kanban (5 Colunas) ─────────────────────────────────────── -->
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-start overflow-x-auto pb-6">
+
+        {% for key, col in colunas.items %}
+        <div class="kanban-col-bg flex flex-col rounded-2xl p-3.5 border min-h-[600px] transition-colors">
+            
+            <!-- Cabeçalho da Coluna -->
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    {% if key == 'backlog' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    {% elif key == 'sprint' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    {% elif key == 'em_construcao' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    {% elif key == 'homologacao' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    {% elif key == 'concluido' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    {% endif %}
+                    <h3 class="text-sm font-bold text-slate-800 tracking-tight">{{ col.titulo }}</h3>
+                </div>
+                <span class="kanban-count-badge px-2 py-0.5 text-xs font-bold rounded-full border shadow-2xs">
+                    {{ col.projetos|length }}
+                </span>
+            </div>
+
+            <!-- Lista de Cards (Área Drop) -->
+            <div class="kanban-column flex-1 flex flex-col gap-3 min-h-[500px]" data-status="{{ key }}">
+                {% for proj in col.projetos %}
+                <div class="kanban-card kanban-card-bg p-4 rounded-xl shadow-xs border transition cursor-grab active:cursor-grabbing group relative"
+                     draggable="true"
+                     data-id="{{ proj.id }}">
+                    
+                    <!-- Topo do Card: Cliente / Sistema & Prioridade -->
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 truncate max-w-[130px]" title="{{ proj.cliente.nome }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 text-slate-400 shrink-0">
+                                <path fill-rule="evenodd" d="M4 16.5v-13A2.5 2.5 0 0 1 6.5 1h7A2.5 2.5 0 0 1 16 3.5v13a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1-.75-.75V14a.75.75 0 0 0-.75-.75h-2.5A.75.75 0 0 0 8.5 14v2.5a.75.75 0 0 1-.75.75H5.25a.75.75 0 0 1-.75-.75Zm2.5-14a1 1 0 0 0-1 1v1h2v-1a1 1 0 0 0-1-1h-.5ZM6.5 6v1h2V6h-2Zm0 3v1h2V9h-2Zm5-6.5a1 1 0 0 0-1 1v1h2v-1a1 1 0 0 0-1-1h-.5Zm-1 4.5v1h2V7h-2Zm0 3v1h2v-1h-2Z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="truncate">{{ proj.cliente.nome }}</span>
+                        </span>
+                        
+                        <!-- Badge de Prioridade -->
+                        {% if proj.prioridade == 'critica' %}
+                        <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30">Crítica</span>
+                        {% elif proj.prioridade == 'alta' %}
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30">Alta</span>
+                        {% elif proj.prioridade == 'media' %}
+                        <span class="px-2 py-0.5 text-[10px] font-semibold uppercase rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/30">Média</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 text-[10px] font-medium uppercase rounded-md bg-slate-500/10 text-slate-400 border border-slate-500/30">Baixa</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Título do Projeto -->
+                    <h4 class="text-sm font-bold text-slate-100 group-hover:text-indigo-400 transition line-clamp-2 mb-1.5">
+                        {{ proj.nome }}
+                    </h4>
+
+                    {% if proj.descricao %}
+                    <p class="text-xs text-slate-400 line-clamp-2 mb-3">
+                        {{ proj.descricao }}
+                    </p>
+                    {% endif %}
+
+                    <!-- Barra de Progresso baseada nos Chamados -->
+                    <div class="kanban-card-inner mb-3 p-2.5 rounded-lg border">
+                        <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1">
+                            <span>Progresso</span>
+                            <span class="text-indigo-400 font-bold">{{ proj.progresso_percentual }}%</span>
+                        </div>
+                        <div class="kanban-progress-track w-full rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full {% if proj.progresso_percentual == 100 %}bg-emerald-500{% else %}bg-indigo-500{% endif %} transition-all duration-300"
+                                 style="width: {{ proj.progresso_percentual }}%"></div>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                            <span>{{ proj.chamados_concluidos }}/{{ proj.total_chamados }} chamados resolvidos</span>
+                            {% if proj.chamados_abertos > 0 %}
+                            <span class="text-amber-400 font-medium">{{ proj.chamados_abertos }} abertos</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Rodapé do Card: Responsável & Datas -->
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-700/40 text-[11px] text-slate-400">
+                        <div class="flex items-center gap-1.5 truncate max-w-[120px]" title="Responsável: {% if proj.responsavel_lider %}{{ proj.responsavel_lider.get_full_name|default:proj.responsavel_lider.username }}{% else %}Não atribuído{% endif %}">
+                            <div class="w-5 h-5 rounded-full bg-slate-700 text-[10px] font-bold text-slate-200 flex items-center justify-center shrink-0">
+                                {% if proj.responsavel_lider %}
+                                    {{ proj.responsavel_lider.first_name|first|default:proj.responsavel_lider.username|first|upper }}
+                                {% else %}
+                                    ?
+                                {% endif %}
+                            </div>
+                            <span class="truncate">
+                                {% if proj.responsavel_lider %}
+                                    {{ proj.responsavel_lider.first_name|default:proj.responsavel_lider.username }}
+                                {% else %}
+                                    Sem Líder
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        {% if user_role == 'admin' or user_role == 'gestor' %}
+                        <div class="flex items-center gap-1">
+                            <a href="{% url 'projeto_update' proj.id %}" class="p-1 text-slate-400 hover:text-indigo-400 hover:bg-indigo-900/30 rounded transition" title="Editar Projeto">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                                    <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+                                </svg>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+                {% empty %}
+                <div class="kanban-placeholder-box empty-placeholder p-4 text-center border-2 border-dashed rounded-xl text-xs my-auto">
+                    Nenhum projeto nesta etapa
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+<!-- ── Painel Lateral Retrátil (Drawer): Como Funciona o Kanban ───────── -->
+<div id="drawer-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 hidden transition-opacity duration-300 opacity-0"></div>
+
+<div id="guide-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-[#1a1a1c] border-l border-slate-200 dark:border-slate-800 shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col overflow-hidden">
+    
+    <!-- Cabeçalho do Drawer -->
+    <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-[#1e1e22]">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd" d="M2.25 13.5a8.25 8.25 0 0 1 8.25-8.25.75.75 0 0 1 .75.75v6.75H18a.75.75 0 0 1 .75.75 8.25 8.25 0 0 1-16.5 0Z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M12.75 3a.75.75 0 0 1 .75-.75 8.25 8.25 0 0 1 8.25 8.25.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75V3Z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">Como Funciona o Kanban</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Guia de gestão ágil e ciclo de vida dos projetos.</p>
+            </div>
+        </div>
+        <button id="btn-close-guide" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Conteúdo do Drawer -->
+    <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-slate-600 dark:text-slate-300">
+        
+        <!-- Bloco 1: Esteira Horizontal -->
+        <div class="space-y-3">
+            <div class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M2 3.75A.75.75 0 0 1 2.75 3h14.5a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75V3.75ZM3.5 4.5v11h3.5v-11H3.5Zm5 0v11h3v-11h-3Zm4.5 0v11H16.5v-11H13Z" clip-rule="evenodd"/>
+                </svg>
+                <span>1. Esteira de Etapas (Horizontal)</span>
+            </div>
+            <div class="space-y-2.5">
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#232326] border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-semibold text-slate-800 dark:text-slate-100 text-xs mb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-slate-400"></span> Backlog Geral
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Repositório de sistemas e demandas futuras ordenadas por prioridade.</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#232326] border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-semibold text-slate-800 dark:text-slate-100 text-xs mb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span> Sprint Atual
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">O foco e compromisso do ciclo de trabalho atual da equipe.</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#232326] border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-semibold text-slate-800 dark:text-slate-100 text-xs mb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span> Em Construção
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Desenvolvimento ativo, codificação e implementação técnica.</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#232326] border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-semibold text-slate-800 dark:text-slate-100 text-xs mb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span> Homologação / Testes
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Validação da solução, testes de aceitação e aprovação de qualidade.</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#232326] border border-slate-200/60 dark:border-slate-800">
+                    <div class="font-semibold text-slate-800 dark:text-slate-100 text-xs mb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Em Produção / Concluído
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Projeto entregue, 100% finalizado e operando para os usuários.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloco 2: Conexão com Chamados -->
+        <div class="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
+                </svg>
+                <span>2. Cálculo do Progresso (Vertical)</span>
+            </div>
+            <p class="text-xs leading-relaxed">
+                A barra de progresso de cada projeto é calculada automaticamente através dos chamados vinculados:
+            </p>
+            <div class="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/50 dark:border-indigo-800/40 text-xs font-mono text-indigo-800 dark:text-indigo-300">
+                Progresso = (Chamados Resolvidos / Total de Chamados) × 100
+            </div>
+        </div>
+
+        <!-- Bloco 3: Reaberturas & Movimentação -->
+        <div class="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.75a.75.75 0 0 0-.75.75v4.482a.75.75 0 0 0 1.5 0v-2.078l.45.45a7 7 0 0 0 11.84-3.238.75.75 0 0 0-1.478-.371Zm-10.624-2.848a5.5 5.5 0 0 1 9.201-2.466l.312.311H11.75a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 .75-.75V2.689a.75.75 0 0 0-1.5 0v2.078l-.45-.45a7 7 0 0 0-11.84 3.238.75.75 0 1 0 1.478.371Z" clip-rule="evenodd" />
+                </svg>
+                <span>3. Ciclos Vivos & Reabertura</span>
+            </div>
+            <p class="text-xs leading-relaxed">
+                Projetos podem ser reabertos ou movidos livremente. Se novos chamados forem adicionados, o percentual de conclusão se recalibra em tempo real, permitindo arrastar o card de volta para a Sprint ou Construção.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- Rodapé do Drawer -->
+    <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1e1e22]">
+        <button id="btn-close-guide-footer" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition">
+            Entendi
+        </button>
+    </div>
+</div>
+
+<!-- ── Script Interativo de Drag & Drop e Controle do Drawer ──────────────── -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Controle do Drawer (Guia)
+    const btnOpenGuide = document.getElementById('btn-open-guide');
+    const btnCloseGuide = document.getElementById('btn-close-guide');
+    const btnCloseGuideFooter = document.getElementById('btn-close-guide-footer');
+    const drawer = document.getElementById('guide-drawer');
+    const backdrop = document.getElementById('drawer-backdrop');
+
+    function openGuide() {
+        if (backdrop && drawer) {
+            backdrop.classList.remove('hidden');
+            setTimeout(() => {
+                backdrop.classList.add('opacity-100');
+                drawer.classList.remove('translate-x-full');
+            }, 10);
+        }
+    }
+
+    function closeGuide() {
+        if (backdrop && drawer) {
+            drawer.classList.add('translate-x-full');
+            backdrop.classList.remove('opacity-100');
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+            }, 300);
+        }
+    }
+
+    if (btnOpenGuide) btnOpenGuide.addEventListener('click', openGuide);
+    if (btnCloseGuide) btnCloseGuide.addEventListener('click', closeGuide);
+    if (btnCloseGuideFooter) btnCloseGuideFooter.addEventListener('click', closeGuide);
+    if (backdrop) backdrop.addEventListener('click', closeGuide);
+
+    // 2. Drag & Drop e Reatividade SPA dos Contadores
+    const columns = document.querySelectorAll('.kanban-column');
+    let draggedCard = null;
+
+    function updateKanbanCounters() {
+        let totalCardsGeral = 0;
+        let concluidosCount = 0;
+
+        columns.forEach(col => {
+            const colContainer = col.closest('.kanban-col-bg');
+            const countBadge = colContainer ? colContainer.querySelector('.kanban-count-badge') : null;
+            const cardsNaCol = col.querySelectorAll('.kanban-card');
+            const totalCol = cardsNaCol.length;
+            totalCardsGeral += totalCol;
+
+            if (col.dataset.status === 'concluido') {
+                concluidosCount = totalCol;
+            }
+
+            if (countBadge) {
+                countBadge.textContent = totalCol;
+            }
+
+            const placeholder = col.querySelector('.empty-placeholder');
+            if (placeholder) {
+                placeholder.style.display = totalCol === 0 ? 'block' : 'none';
+            }
+        });
+
+        const taxaEl = document.getElementById('stat-taxa-conclusao');
+        const totalEl = document.getElementById('stat-total-projetos');
+        if (totalEl) totalEl.textContent = totalCardsGeral;
+        if (taxaEl && totalCardsGeral > 0) {
+            taxaEl.textContent = ((concluidosCount / totalCardsGeral) * 100).toFixed(1).replace('.', ',') + '%';
+        }
+    }
+
+    document.querySelectorAll('.kanban-card').forEach(card => {
+        card.setAttribute('draggable', 'true');
+        
+        card.addEventListener('dragstart', (e) => {
+            draggedCard = card;
+            card.classList.add('opacity-40', 'scale-95');
+            e.dataTransfer.setData('text/plain', card.dataset.id || '');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        card.addEventListener('dragend', () => {
+            draggedCard = null;
+            card.classList.remove('opacity-40', 'scale-95');
+        });
+    });
+
+    columns.forEach(col => {
+        col.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            col.classList.add('bg-indigo-50/20', 'ring-2', 'ring-indigo-400/50');
+        });
+
+        col.addEventListener('dragleave', () => {
+            col.classList.remove('bg-indigo-50/20', 'ring-2', 'ring-indigo-400/50');
+        });
+
+        col.addEventListener('drop', (e) => {
+            e.preventDefault();
+            col.classList.remove('bg-indigo-50/20', 'ring-2', 'ring-indigo-400/50');
+            
+            if (draggedCard) {
+                col.appendChild(draggedCard);
+                updateKanbanCounters();
+
+                const projetoId = draggedCard.dataset.id;
+                const novoStatus = col.dataset.status;
+                const cardsNaColuna = Array.from(col.querySelectorAll('.kanban-card'));
+                const novaOrdem = cardsNaColuna.indexOf(draggedCard);
+
+                fetch("{% url 'projeto_mover_kanban' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        projeto_id: projetoId,
+                        novo_status: novoStatus,
+                        nova_ordem: novaOrdem
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Erro ao mover projeto:', data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro de rede ao salvar posição:', err);
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

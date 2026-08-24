@@ -1,0 +1,22 @@
+.git
+.gitignore
+.env
+.env.example
+.venv
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+node_modules/
+image.png
+image copy.png
+chamados.html
+chamados.md
+relatorio-seguranca-digiana.txt
+CHECKLIST_RAILWAY.md

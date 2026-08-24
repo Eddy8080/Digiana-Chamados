@@ -28,13 +28,59 @@ class Cliente(models.Model):
         return self.nome
 
 class Projeto(models.Model):
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog Geral'),
+        ('sprint', 'Sprint Atual'),
+        ('em_construcao', 'Em Construção'),
+        ('homologacao', 'Homologação / Testes'),
+        ('concluido', 'Em Produção / Concluído'),
+    ]
+
+    PRIORIDADE_CHOICES = [
+        ('baixa', 'Baixa'),
+        ('media', 'Média'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica'),
+    ]
+
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='projetos')
+    sistema = models.ForeignKey('Sistema', on_delete=models.SET_NULL, null=True, blank=True, related_name='projetos')
     nome = models.CharField(max_length=150)
     descricao = models.TextField(blank=True, null=True)
+    status_macro = models.CharField(max_length=20, choices=STATUS_CHOICES, default='backlog', verbose_name='Status no Kanban')
+    prioridade = models.CharField(max_length=10, choices=PRIORIDADE_CHOICES, default='media', verbose_name='Prioridade')
+    responsavel_lider = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='projetos_liderados', verbose_name='Líder / Responsável')
+    ordem_posicao = models.IntegerField(default=0, verbose_name='Posição na Coluna')
+    data_inicio = models.DateField(null=True, blank=True, verbose_name='Data de Início')
+    data_previsao_entrega = models.DateField(null=True, blank=True, verbose_name='Previsão de Entrega')
+    data_conclusao = models.DateField(null=True, blank=True, verbose_name='Data de Conclusão')
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ordem_posicao', '-criado_em']
 
     def __str__(self):
         return f"{self.nome} ({self.cliente.nome})"
+
+    @property
+    def total_chamados(self):
+        return self.chamados.filter(excluido=False).count()
+
+    @property
+    def chamados_concluidos(self):
+        return self.chamados.filter(excluido=False, status__in=['resolvido', 'fechado']).count()
+
+    @property
+    def chamados_abertos(self):
+        return self.chamados.filter(excluido=False, status__in=['aberto', 'em_progresso', 'pendente']).count()
+
+    @property
+    def progresso_percentual(self):
+        total = self.total_chamados
+        if total == 0:
+            return 100 if self.status_macro == 'concluido' else 0
+        return int((self.chamados_concluidos / total) * 100)
 
 class Chamado(models.Model):
     STATUS_CHOICES = [

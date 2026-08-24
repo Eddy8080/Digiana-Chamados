@@ -15,14 +15,14 @@
 <div class="space-y-8">
 
     <!-- Topo Dashboard -->
-    <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between sm:items-center">
+    <div class="flex flex-col items-start gap-4 lg:flex-row lg:justify-between lg:items-center">
         <div>
             <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
             <p class="text-slate-500 mt-1">Acompanhe e gerencie a evolução de chamados em aberto.</p>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-3">
             <!-- relógio em tempo real -->
-            <span id="live-badge" class="inline-flex items-center gap-2 text-sm font-medium text-slate-400">
+            <span id="live-badge" class="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-slate-400 mr-1">
                 <span class="relative flex h-2 w-2">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -31,7 +31,34 @@
                 <span class="text-slate-500/60">|</span>
                 <span id="last-updated" class="font-mono tabular-nums select-none"></span>
             </span>
-            <a href="{% url 'chamado_create' %}" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition flex items-center space-x-2">
+
+            {% if user_role == 'admin' or user_role == 'gestor' or user_role == 'dev' %}
+            <a href="{% url 'projetos_kanban' %}"
+               class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-indigo-200 shadow-sm text-sm font-semibold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 transition" title="Quadro Kanban de Projetos">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-indigo-600">
+                    <path fill-rule="evenodd" d="M2 3.75A.75.75 0 0 1 2.75 3h14.5a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75V3.75ZM3.5 4.5v11h3.5v-11H3.5Zm5 0v11h3v-11h-3Zm4.5 0v11H16.5v-11H13Z" clip-rule="evenodd"/>
+                </svg>
+                Kanban
+            </a>
+            <a href="{% url 'relatorios' %}"
+               class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-cyan-200 shadow-sm text-sm font-semibold text-cyan-700 hover:bg-cyan-50 hover:border-cyan-400 transition" title="Relatórios Executivos">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-cyan-500">
+                    <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z"/>
+                </svg>
+                Relatórios
+            </a>
+            {% if user_role == 'admin' %}
+            <a href="{% url 'sla_list' %}"
+               class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-violet-200 shadow-sm text-sm font-semibold text-violet-700 hover:bg-violet-50 hover:border-violet-400 transition" title="Gerenciar SLAs">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-violet-500">
+                    <path fill-rule="evenodd" d="M1 7.75A3.75 3.75 0 0 1 4.75 4h10.5A3.75 3.75 0 0 1 19 7.75v5.5A3.75 3.75 0 0 1 15.25 17H4.75A3.75 3.75 0 0 1 1 13.25V7.75Zm4.5 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-6-3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" clip-rule="evenodd"/>
+                </svg>
+                SLAs
+            </a>
+            {% endif %}
+            {% endif %}
+
+            <a href="{% url 'chamado_create' %}" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-500/20 transition flex items-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
                     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
                 </svg>
@@ -39,26 +66,6 @@
             </a>
         </div>
     </div>
-
-    {% if user_role == 'admin' %}
-    <!-- Atalhos Admin -->
-    <div class="flex items-center gap-3">
-        <a href="{% url 'relatorios' %}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-cyan-200 shadow-sm text-sm font-semibold text-cyan-700 hover:bg-cyan-50 hover:border-cyan-400 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-cyan-500">
-                <path d="M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z"/>
-            </svg>
-            Ver Relatórios
-        </a>
-        <a href="{% url 'sla_list' %}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-violet-200 shadow-sm text-sm font-semibold text-violet-700 hover:bg-violet-50 hover:border-violet-400 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-violet-500">
-                <path fill-rule="evenodd" d="M1 7.75A3.75 3.75 0 0 1 4.75 4h10.5A3.75 3.75 0 0 1 19 7.75v5.5A3.75 3.75 0 0 1 15.25 17H4.75A3.75 3.75 0 0 1 1 13.25V7.75Zm4.5 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-6-3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" clip-rule="evenodd"/>
-            </svg>
-            Gerenciar SLAs
-        </a>
-    </div>
-    {% endif %}
 
     <!-- Cards de Métricas -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -144,6 +151,72 @@
         </div>
 
     </div>
+
+    {% if projetos_sprint %}
+    <!-- ── Widget Executivo: Projetos & Sistemas em Andamento (Sprint/Construção) ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M2 3.75A.75.75 0 0 1 2.75 3h14.5a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75V3.75ZM3.5 4.5v11h3.5v-11H3.5Zm5 0v11h3v-11h-3Zm4.5 0v11H16.5v-11H13Z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-slate-800">Projetos & Sistemas em Andamento (Sprint / Ciclo Atual)</h2>
+                    <p class="text-xs text-slate-500">Visão macro de entrega e evolução dos chamados.</p>
+                </div>
+            </div>
+            <a href="{% url 'projetos_kanban' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 transition">
+                Abrir Quadro Kanban Completo
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
+                </svg>
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for proj in projetos_sprint %}
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-indigo-300 hover:shadow-xs transition">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span class="text-[11px] font-semibold text-slate-500 truncate" title="{{ proj.cliente.nome }}">{{ proj.cliente.nome }}</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-md 
+                                {% if proj.status_macro == 'sprint' %}bg-blue-100 text-blue-800
+                                {% elif proj.status_macro == 'em_construcao' %}bg-amber-100 text-amber-800
+                                {% elif proj.status_macro == 'homologacao' %}bg-purple-100 text-purple-800
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ proj.get_status_macro_display }}
+                    </span>
+                </div>
+                
+                <h3 class="text-sm font-bold text-slate-800 line-clamp-1 mb-2">{{ proj.nome }}</h3>
+
+                <!-- Barra de Progresso -->
+                <div class="space-y-1 mb-3">
+                    <div class="flex justify-between text-[11px] font-semibold text-slate-600">
+                        <span>Progresso</span>
+                        <span class="text-indigo-600">{{ proj.progresso_percentual }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-1.5">
+                        <div class="h-1.5 rounded-full {% if proj.progresso_percentual == 100 %}bg-emerald-500{% else %}bg-indigo-600{% endif %}"
+                             style="width: {{ proj.progresso_percentual }}%"></div>
+                    </div>
+                    <div class="text-[10px] text-slate-400">
+                        {{ proj.chamados_concluidos }}/{{ proj.total_chamados }} chamados fechados
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
+                    <span class="truncate">Líder: {% if proj.responsavel_lider %}{{ proj.responsavel_lider.first_name|default:proj.responsavel_lider.username }}{% else %}—{% endif %}</span>
+                    {% if proj.data_previsao_entrega %}
+                    <span class="text-[10px] text-slate-400">Entrega: {{ proj.data_previsao_entrega|date:"d/m" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Tabela / Lista de Chamados Recentes -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
