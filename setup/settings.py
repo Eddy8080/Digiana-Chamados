@@ -31,7 +31,23 @@ DEBUG = os.environ.get('DEBUG', 'False' if _on_railway else 'True') == 'True'
 # Railway injeta RAILWAY_PUBLIC_DOMAIN automaticamente; garante que o host seja permitido
 _railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
 _default_hosts = f'localhost,127.0.0.1,{_railway_domain}' if _railway_domain else 'localhost,127.0.0.1'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
+
+_csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if _csrf_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_env.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        f'http://{h}:{p}'
+        for h in ALLOWED_HOSTS
+        for p in (8000, 8001)
+        if h != '*'
+    ] + [
+        f'https://{h}'
+        for h in ALLOWED_HOSTS
+        if h != '*'
+    ]
+
 
 # ── Segurança em produção (Railway faz terminação TLS via proxy reverso) ──────
 if _on_railway:
