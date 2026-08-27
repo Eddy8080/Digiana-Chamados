@@ -51,7 +51,8 @@
                             </a>
                             {% if user_role == 'admin' %}
                             <form method="POST" action="{% url 'projeto_delete' projeto.pk %}"
-                                  onsubmit="return confirm('Excluir o projeto {{ projeto.nome }}?\n\nAtenção: todos os chamados vinculados também serão excluídos. Esta ação não pode ser desfeita.')">
+                                  data-confirm-title="Excluir o projeto {{ projeto.nome }}?"
+                                  data-confirm-detail="Atenção: todos os chamados vinculados também serão excluídos. Esta ação não pode ser desfeita.">
                                 {% csrf_token %}
                                 <button type="submit"
                                         class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 transition">

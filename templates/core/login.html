@@ -51,6 +51,43 @@
     html.light-mode .theme-banner-light {
         display: block;
     }
+
+    /* Dissolve a borda retangular do PNG no fundo da página — em vez de
+       um recorte visível ("moldura"), a arte esmaece gradualmente nas
+       bordas, como se a luz do logo se espalhasse direto no ambiente. */
+    .theme-banner {
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 14%, black 80%, transparent 100%),
+                             linear-gradient(to right, transparent 0%, black 18%, black 100%);
+        -webkit-mask-composite: source-in;
+        mask-image: linear-gradient(to bottom, transparent 0%, black 14%, black 80%, transparent 100%),
+                    linear-gradient(to right, transparent 0%, black 18%, black 100%);
+        mask-composite: intersect;
+    }
+
+    /* Botão de revelar senha (segurar para mostrar) — glow ciano do Digiana */
+    .pwd-toggle-btn {
+        background: transparent;
+        border: none;
+        color: #00f0ff;
+        opacity: 0.55;
+        cursor: pointer;
+        transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+    .pwd-toggle-btn:hover {
+        opacity: 0.85;
+    }
+    .pwd-toggle-btn:active,
+    .pwd-toggle-btn.is-revealing {
+        opacity: 1;
+        filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.7));
+    }
+    html.light-mode .pwd-toggle-btn {
+        color: #0090bb;
+    }
+    html.light-mode .pwd-toggle-btn:active,
+    html.light-mode .pwd-toggle-btn.is-revealing {
+        filter: drop-shadow(0 0 3px rgba(0, 144, 187, 0.5));
+    }
 </style>
 {% endblock %}
 
@@ -66,12 +103,36 @@
                 {% for field in form %}
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+                    {% if field.field.widget.input_type == 'password' %}
+                    <div class="relative">
+                        <input type="password"
+                               name="{{ field.html_name }}"
+                               id="{{ field.id_for_label }}"
+                               class="w-full px-4 py-3 pr-12 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition"
+                               autocomplete="off"
+                               required>
+                        <button type="button"
+                                class="pwd-toggle-btn absolute right-2 top-1/2 -translate-y-1/2 p-2 select-none"
+                                data-target="{{ field.id_for_label }}"
+                                tabindex="-1"
+                                aria-label="Segure para mostrar a senha">
+                            <svg class="pwd-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.42 19.42 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a19.5 19.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                            <svg class="pwd-icon-on hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    {% else %}
                     <input type="{{ field.field.widget.input_type|default:'text' }}"
                            name="{{ field.html_name }}"
                            id="{{ field.id_for_label }}"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition"
-                           {% if field.field.widget.input_type == 'password' %}autocomplete="off"{% endif %}
                            required>
+                    {% endif %}
                 </div>
                 {% endfor %}
 
@@ -86,13 +147,44 @@
         <div class="hidden lg:block"></div>
     </div>
 
-    <section class="login-banner-panel hidden items-stretch justify-end overflow-hidden lg:flex">
+    <section class="login-banner-panel hidden items-stretch justify-center overflow-hidden lg:flex">
         <img src="{% static 'img/Dark.png' %}"
              alt="Banner Digiana"
-             class="theme-banner theme-banner-dark h-full w-auto max-w-full object-contain object-right">
+             class="theme-banner theme-banner-dark h-full w-auto max-w-full object-contain object-center">
         <img src="{% static 'img/Light.png' %}"
              alt="Banner Digiana"
-             class="theme-banner theme-banner-light hidden h-full w-auto max-w-full object-contain object-right">
+             class="theme-banner theme-banner-light hidden h-full w-auto max-w-full object-contain object-center">
     </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.pwd-toggle-btn').forEach(function (btn) {
+    var input = document.getElementById(btn.dataset.target);
+    var iconOff = btn.querySelector('.pwd-icon-off');
+    var iconOn = btn.querySelector('.pwd-icon-on');
+    if (!input) return;
+
+    function reveal() {
+        input.type = 'text';
+        btn.classList.add('is-revealing');
+        iconOff.classList.add('hidden');
+        iconOn.classList.remove('hidden');
+    }
+    function hide() {
+        input.type = 'password';
+        btn.classList.remove('is-revealing');
+        iconOn.classList.add('hidden');
+        iconOff.classList.remove('hidden');
+    }
+
+    btn.addEventListener('mousedown', reveal);
+    btn.addEventListener('touchstart', function (e) { e.preventDefault(); reveal(); }, { passive: false });
+
+    ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(function (evt) {
+        btn.addEventListener(evt, hide);
+    });
+});
+</script>
 {% endblock %}

@@ -167,53 +167,27 @@
                     <p class="text-xs text-slate-500">Visão macro de entrega e evolução dos chamados.</p>
                 </div>
             </div>
-            <a href="{% url 'projetos_kanban' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 transition">
-                Abrir Quadro Kanban Completo
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-                    <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
-                </svg>
-            </a>
+            <div class="flex items-center gap-3">
+                <a href="{% url 'projetos_kanban' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 transition">
+                    Abrir Quadro Kanban Completo
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" />
+                    </svg>
+                </a>
+                <button type="button" id="sprint-toggle"
+                        title="Recolher/expandir"
+                        class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+                    <svg id="sprint-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 transition-transform duration-200">
+                        <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {% for proj in projetos_sprint %}
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-indigo-300 hover:shadow-xs transition">
-                <div class="flex items-center justify-between gap-2 mb-2">
-                    <span class="text-[11px] font-semibold text-slate-500 truncate" title="{{ proj.cliente.nome }}">{{ proj.cliente.nome }}</span>
-                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-md 
-                                {% if proj.status_macro == 'sprint' %}bg-blue-100 text-blue-800
-                                {% elif proj.status_macro == 'em_construcao' %}bg-amber-100 text-amber-800
-                                {% elif proj.status_macro == 'homologacao' %}bg-purple-100 text-purple-800
-                                {% else %}bg-slate-100 text-slate-700{% endif %}">
-                        {{ proj.get_status_macro_display }}
-                    </span>
-                </div>
-                
-                <h3 class="text-sm font-bold text-slate-800 line-clamp-1 mb-2">{{ proj.nome }}</h3>
-
-                <!-- Barra de Progresso -->
-                <div class="space-y-1 mb-3">
-                    <div class="flex justify-between text-[11px] font-semibold text-slate-600">
-                        <span>Progresso</span>
-                        <span class="text-indigo-600">{{ proj.progresso_percentual }}%</span>
-                    </div>
-                    <div class="w-full bg-slate-200 rounded-full h-1.5">
-                        <div class="h-1.5 rounded-full {% if proj.progresso_percentual == 100 %}bg-emerald-500{% else %}bg-indigo-600{% endif %}"
-                             style="width: {{ proj.progresso_percentual }}%"></div>
-                    </div>
-                    <div class="text-[10px] text-slate-400">
-                        {{ proj.chamados_concluidos }}/{{ proj.total_chamados }} chamados fechados
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-                    <span class="truncate">Líder: {% if proj.responsavel_lider %}{{ proj.responsavel_lider.first_name|default:proj.responsavel_lider.username }}{% else %}—{% endif %}</span>
-                    {% if proj.data_previsao_entrega %}
-                    <span class="text-[10px] text-slate-400">Entrega: {{ proj.data_previsao_entrega|date:"d/m" }}</span>
-                    {% endif %}
-                </div>
+        <div id="projetos-sprint-grid-wrap">
+            <div id="projetos-sprint-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {% include 'core/_dashboard_projetos_sprint.html' %}
             </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
@@ -225,116 +199,9 @@
             <a href="{% url 'chamados_list' %}" class="text-sm font-semibold text-blue-600 hover:text-blue-700 transition">Ver todos →</a>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-slate-50 text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                        <th class="px-6 py-4">ID</th>
-                        <th class="px-6 py-4">Título</th>
-                        <th class="px-6 py-4">Projeto</th>
-                        <th class="px-6 py-4">Prioridade</th>
-                        <th class="px-6 py-4">Status</th>
-                        <th class="px-6 py-4">Responsável</th>
-                        <th class="px-6 py-4">Data</th>
-                        <th class="px-6 py-4"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 text-sm text-slate-600">
-                    {% for chamado in chamados %}
-                    <tr class="hover:bg-slate-50/50 transition">
-                        <td class="px-6 py-4 font-mono text-xs text-slate-400">#{{ chamado.id }}</td>
-                        <td class="px-6 py-4 font-semibold text-slate-800">{{ chamado.titulo }}</td>
-                        <td class="px-6 py-4">{{ chamado.projeto.nome }}</td>
-                        <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
-                                {% if chamado.prioridade == 'alta' %}bg-rose-50 text-rose-700{% elif chamado.prioridade == 'media' %}bg-amber-50 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">
-                                {{ chamado.get_prioridade_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
-                                {% if chamado.status == 'aberto' %}bg-amber-50 text-amber-700
-                                {% elif chamado.status == 'em_progresso' %}bg-blue-50 text-blue-700
-                                {% elif chamado.status == 'pendente' %}bg-purple-50 text-purple-700
-                                {% elif chamado.status == 'resolvido' %}bg-emerald-50 text-emerald-700
-                                {% else %}bg-slate-100 text-slate-700{% endif %}">
-                                {{ chamado.get_status_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4">
-                            {% if chamado.responsavel %}
-                                {{ chamado.responsavel.username }}
-                            {% else %}
-                                <span class="text-slate-400 italic">Não atribuído</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-xs text-slate-400">{{ chamado.criado_em|date:"d/m/Y H:i" }}</td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-2 justify-end">
-                                <a href="{% url 'chamado_detail' chamado.id %}"
-                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 transition">
-                                    Detalhar
-                                </a>
-                                {% if user_role == 'admin' %}
-                                <form method="POST" action="{% url 'chamado_delete' chamado.id %}"
-                                      onsubmit="return confirm('Excluir o chamado #{{ chamado.id }}?\n\nEsta ação não pode ser desfeita.')">
-                                    {% csrf_token %}
-                                    <button type="submit"
-                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5">
-                                            <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.712Z" clip-rule="evenodd"/>
-                                        </svg>
-                                        Excluir
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-slate-400">
-                            Nenhum chamado registrado no momento.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div id="chamados-card-body">
+            {% include 'core/_dashboard_chamados_table.html' %}
         </div>
-
-        <!-- Paginação -->
-        {% if page_obj.paginator.num_pages > 1 %}
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-            <p class="text-xs text-slate-500">
-                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-            </p>
-            <div class="flex items-center gap-1">
-                {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}"
-                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-                    ‹ Anterior
-                </a>
-                {% endif %}
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                    <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white border border-blue-600">{{ num }}</span>
-                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
-                    <a href="?page={{ num }}"
-                       class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-                        {{ num }}
-                    </a>
-                    {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}"
-                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-                    Próxima ›
-                </a>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
     </div>
 
 </div>
@@ -359,7 +226,7 @@
 
 (function () {
     const INTERVAL = 15000;
-    const URL = '{% url "dashboard_stats" %}';
+    const BASE_URL = '{% url "dashboard_stats" %}';
 
     const els = {
         total:      document.getElementById('stat-total'),
@@ -368,6 +235,9 @@
         pendentes:  document.getElementById('stat-pendentes'),
         resolvidos: document.getElementById('stat-resolvidos'),
     };
+
+    const chamadosBody = document.getElementById('chamados-card-body');
+    const projetosGrid  = document.getElementById('projetos-sprint-grid');
 
     function pop(el) {
         el.classList.remove('stat-pop');
@@ -384,7 +254,8 @@
     }
 
     function poll() {
-        fetch(URL)
+        const currentPage = new URLSearchParams(window.location.search).get('page') || '1';
+        fetch(BASE_URL + '?page=' + encodeURIComponent(currentPage))
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 setVal(els.total,      data.total);
@@ -392,6 +263,15 @@
                 setVal(els.progresso,  data.em_progresso);
                 setVal(els.pendentes,  data.pendentes);
                 setVal(els.resolvidos, data.resolvidos);
+
+                // só substitui a tabela quando o servidor mandou HTML novo
+                // (ele só renderiza para quem está vendo a página 1)
+                if (chamadosBody && typeof data.recentes_html === 'string') {
+                    chamadosBody.innerHTML = data.recentes_html;
+                }
+                if (projetosGrid && typeof data.projetos_html === 'string') {
+                    projetosGrid.innerHTML = data.projetos_html;
+                }
             })
             .catch(function () { /* ignora falha silenciosamente */ });
     }
@@ -401,6 +281,77 @@
         poll();
         setInterval(poll, INTERVAL);
     }, 5000);
+})();
+</script>
+
+<script>
+(function () {
+    // ── Recolher/expandir a seção "Projetos & Sistemas em Andamento" ──
+    var STORAGE_KEY = 'digiana-sprint-collapsed';
+    var toggleBtn = document.getElementById('sprint-toggle');
+    var chevron   = document.getElementById('sprint-chevron');
+    var wrap      = document.getElementById('projetos-sprint-grid-wrap');
+
+    if (toggleBtn && wrap) {
+        function applyCollapsed(collapsed) {
+            wrap.style.display = collapsed ? 'none' : '';
+            chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+        }
+        applyCollapsed(localStorage.getItem(STORAGE_KEY) === '1');
+
+        toggleBtn.addEventListener('click', function () {
+            var collapsed = wrap.style.display === 'none';
+            var next = !collapsed;
+            applyCollapsed(next);
+            localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
+        });
+    }
+
+    // ── Remover card da visão de Sprint (não exclui projeto/chamados) ──
+    // Delegação de evento no container pai, pois o grid é substituído
+    // pelo polling a cada 15s (innerHTML novo perderia listeners diretos).
+    var sprintSection = document.getElementById('projetos-sprint-grid-wrap');
+    if (sprintSection) {
+        sprintSection.addEventListener('click', function (e) {
+            var btn = e.target.closest('.sprint-remove-btn');
+            if (!btn) return;
+
+            var projetoId   = btn.dataset.projetoId;
+            var projetoNome = btn.dataset.projetoNome;
+
+            window.DigianaConfirm.ask(
+                'Remover "' + projetoNome + '" da visão de Sprint?',
+                'O projeto e seus chamados continuam existindo — ele só volta para "Backlog Geral" e some deste painel.',
+                'Remover'
+            ).then(function (ok) {
+                if (!ok) return;
+
+                btn.disabled = true;
+                fetch("{% url 'projeto_mover_kanban' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ projeto_id: projetoId, novo_status: 'backlog', nova_ordem: 0 })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            var card = btn.closest('[data-projeto-card]');
+                            if (card) card.remove();
+                        } else {
+                            alert('Não foi possível remover: ' + (data.error || 'erro desconhecido.'));
+                            btn.disabled = false;
+                        }
+                    })
+                    .catch(function () {
+                        alert('Falha de rede ao tentar remover o projeto da Sprint.');
+                        btn.disabled = false;
+                    });
+            });
+        });
+    }
 })();
 </script>
 {% endblock %}

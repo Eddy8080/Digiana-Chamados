@@ -1,0 +1,50 @@
+{% for proj in projetos_sprint %}
+<div class="p-4 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-indigo-300 hover:shadow-xs transition relative group"
+     data-projeto-card data-projeto-id="{{ proj.id }}">
+    {% if user_role != 'usuario' %}
+    <button type="button"
+            class="sprint-remove-btn absolute top-2 right-2 p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition"
+            data-projeto-id="{{ proj.id }}"
+            data-projeto-nome="{{ proj.nome|escapejs }}"
+            title="Remover da visão de Sprint (não exclui o projeto nem os chamados)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+            <path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" clip-rule="evenodd" />
+        </svg>
+    </button>
+    {% endif %}
+    <div class="flex items-center justify-between gap-2 mb-2 pr-5">
+        <span class="text-[11px] font-semibold text-slate-500 truncate" title="{{ proj.cliente.nome }}">{{ proj.cliente.nome }}</span>
+        <span class="px-2 py-0.5 text-[10px] font-bold rounded-md
+                    {% if proj.status_macro == 'sprint' %}bg-blue-100 text-blue-800
+                    {% elif proj.status_macro == 'em_construcao' %}bg-amber-100 text-amber-800
+                    {% elif proj.status_macro == 'homologacao' %}bg-purple-100 text-purple-800
+                    {% else %}bg-slate-100 text-slate-700{% endif %}">
+            {{ proj.get_status_macro_display }}
+        </span>
+    </div>
+
+    <h3 class="text-sm font-bold text-slate-800 line-clamp-1 mb-2">{{ proj.nome }}</h3>
+
+    <!-- Barra de Progresso -->
+    <div class="space-y-1 mb-3">
+        <div class="flex justify-between text-[11px] font-semibold text-slate-600">
+            <span>Progresso</span>
+            <span class="text-indigo-600">{{ proj.progresso_percentual }}%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full {% if proj.progresso_percentual == 100 %}bg-emerald-500{% else %}bg-indigo-600{% endif %}"
+                 style="width: {{ proj.progresso_percentual }}%"></div>
+        </div>
+        <div class="text-[10px] text-slate-400">
+            {{ proj.chamados_concluidos }}/{{ proj.total_chamados }} chamados fechados
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
+        <span class="truncate">Líder: {% if proj.responsavel_lider %}{{ proj.responsavel_lider.first_name|default:proj.responsavel_lider.username }}{% else %}—{% endif %}</span>
+        {% if proj.data_previsao_entrega %}
+        <span class="text-[10px] text-slate-400">Entrega: {{ proj.data_previsao_entrega|date:"d/m" }}</span>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}

@@ -152,6 +152,117 @@
             </div>
         </form>
     </div>
+
+    {% if usuario != request.user and not usuario.is_superuser %}
+    <!-- ── Card Redefinição de Senha ── -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-xl bg-amber-50 text-amber-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                        <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-slate-800">Redefinir Senha do Usuário</h2>
+                    <p class="text-xs text-slate-400">Gere uma senha temporária automática ou defina uma senha na hora.</p>
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" action="{% url 'usuario_reset_senha' usuario.pk %}" class="p-6 space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'usuario_edit' usuario.pk %}">
+
+            <!-- Seleção de Modo -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="edit-reset-mode-container">
+                <label class="edit-reset-card flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-amber-500 bg-amber-50/50" id="edit-reset-auto">
+                    <input type="radio" name="tipo_reset" value="auto" checked class="sr-only">
+                    <div class="mt-0.5 w-4 h-4 rounded-full border-2 border-amber-600 bg-amber-600 flex items-center justify-center flex-shrink-0 edit-reset-dot">
+                        <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                    </div>
+                    <div>
+                        <span class="block text-sm font-bold text-slate-800">Automática por E-mail</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">Gera senha temporária de 12 caracteres e envia ao e-mail.</span>
+                    </div>
+                </label>
+
+                <label class="edit-reset-card flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-slate-200 hover:border-slate-300" id="edit-reset-manual">
+                    <input type="radio" name="tipo_reset" value="manual" class="sr-only">
+                    <div class="mt-0.5 w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center flex-shrink-0 edit-reset-dot">
+                        <span class="w-1.5 h-1.5 rounded-full bg-white hidden"></span>
+                    </div>
+                    <div>
+                        <span class="block text-sm font-bold text-slate-800">Criar Senha na Hora</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">Digitar a nova senha manualmente agora.</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Painel Manual -->
+            <div id="edit-painel-manual" class="hidden space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Nova Senha Manual <span class="text-rose-500">*</span></label>
+                    <div class="relative">
+                        <input type="password" name="nova_senha" id="edit_reset_nova_senha"
+                               class="w-full px-4 py-3 pr-24 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition bg-white"
+                               placeholder="Digite a nova senha">
+                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button type="button" id="btn-edit-reset-toggle" title="Mostrar/Ocultar senha"
+                                    class="p-2 text-slate-400 hover:text-slate-600 rounded-lg transition">
+                                <svg id="edit-eye-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                </svg>
+                                <svg id="edit-eye-closed" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 hidden">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                                </svg>
+                            </button>
+                            <button type="button" id="btn-edit-reset-gerar" title="Gerar senha aleatória"
+                                    class="px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition">
+                                Gerar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-200">
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input type="checkbox" name="exigir_troca" value="1" checked
+                               class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                        <span class="text-xs font-medium text-slate-700">Exigir alteração de senha no próximo login</span>
+                    </label>
+
+                    {% if usuario.email %}
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input type="checkbox" name="notificar_email" value="1" checked
+                               class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                        <span class="text-xs font-medium text-slate-700">Enviar notificação com a nova senha para <strong>{{ usuario.email }}</strong></span>
+                    </label>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Painel Automático -->
+            <div id="edit-painel-auto" class="flex items-start gap-3 px-4 py-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/>
+                </svg>
+                <span>Uma <strong>senha temporária aleatória</strong> de 12 caracteres será gerada e enviada para o e-mail cadastrado ({% if usuario.email %}{{ usuario.email }}{% else %}sem e-mail{% endif %}).</span>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button type="submit"
+                        class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/10 transition flex items-center gap-2 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M8 1a3.5 3.5 0 0 1 3.5 3.5V5A1.5 1.5 0 0 1 13 6.5v6A1.5 1.5 0 0 1 11.5 14h-7A1.5 1.5 0 0 1 3 12.5v-6A1.5 1.5 0 0 1 4.5 5v-.5A3.5 3.5 0 0 1 8 1Zm0 1.5A2 2 0 0 0 6 4.5V5h4v-.5A2 2 0 0 0 8 2.5Zm0 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+                    </svg>
+                    Redefinir Senha do Usuário
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
 </div>
 
 <script>
@@ -202,6 +313,95 @@
             activate(card);
         });
     });
+})();
+
+// ── Redefinição de Senha no Edit ──
+(function () {
+    var cardAuto     = document.getElementById('edit-reset-auto');
+    var cardManual   = document.getElementById('edit-reset-manual');
+    if (!cardAuto || !cardManual) return;
+
+    var radioAuto    = cardAuto.querySelector('input[type="radio"]');
+    var radioManual  = cardManual.querySelector('input[type="radio"]');
+    var painelManual = document.getElementById('edit-painel-manual');
+    var painelAuto   = document.getElementById('edit-painel-auto');
+    var inputSenha   = document.getElementById('edit_reset_nova_senha');
+    var btnToggle    = document.getElementById('btn-edit-reset-toggle');
+    var btnGerar     = document.getElementById('btn-edit-reset-gerar');
+    var iconOpen     = document.getElementById('edit-eye-open');
+    var iconClosed   = document.getElementById('edit-eye-closed');
+
+    function setEditResetMode(mode) {
+        if (mode === 'manual') {
+            radioManual.checked = true;
+            cardManual.classList.add('border-amber-500', 'bg-amber-50/50');
+            cardManual.classList.remove('border-slate-200');
+            var dotM = cardManual.querySelector('.edit-reset-dot');
+            dotM.classList.add('border-amber-600', 'bg-amber-600');
+            dotM.classList.remove('border-slate-300');
+            dotM.querySelector('span').classList.remove('hidden');
+
+            cardAuto.classList.remove('border-amber-500', 'bg-amber-50/50');
+            cardAuto.classList.add('border-slate-200');
+            var dotA = cardAuto.querySelector('.edit-reset-dot');
+            dotA.classList.remove('border-amber-600', 'bg-amber-600');
+            dotA.classList.add('border-slate-300');
+            dotA.querySelector('span').classList.add('hidden');
+
+            painelManual.classList.remove('hidden');
+            painelAuto.classList.add('hidden');
+            inputSenha.focus();
+        } else {
+            radioAuto.checked = true;
+            cardAuto.classList.add('border-amber-500', 'bg-amber-50/50');
+            cardAuto.classList.remove('border-slate-200');
+            var dotA = cardAuto.querySelector('.edit-reset-dot');
+            dotA.classList.add('border-amber-600', 'bg-amber-600');
+            dotA.classList.remove('border-slate-300');
+            dotA.querySelector('span').classList.remove('hidden');
+
+            cardManual.classList.remove('border-amber-500', 'bg-amber-50/50');
+            cardManual.classList.add('border-slate-200');
+            var dotM = cardManual.querySelector('.edit-reset-dot');
+            dotM.classList.remove('border-amber-600', 'bg-amber-600');
+            dotM.classList.add('border-slate-300');
+            dotM.querySelector('span').classList.add('hidden');
+
+            painelManual.classList.add('hidden');
+            painelAuto.classList.remove('hidden');
+        }
+    }
+
+    cardAuto.addEventListener('click', function () { setEditResetMode('auto'); });
+    cardManual.addEventListener('click', function () { setEditResetMode('manual'); });
+
+    if (btnToggle && inputSenha) {
+        btnToggle.addEventListener('click', function () {
+            if (inputSenha.type === 'password') {
+                inputSenha.type = 'text';
+                iconOpen.classList.add('hidden');
+                iconClosed.classList.remove('hidden');
+            } else {
+                inputSenha.type = 'password';
+                iconOpen.classList.remove('hidden');
+                iconClosed.classList.add('hidden');
+            }
+        });
+    }
+
+    if (btnGerar && inputSenha) {
+        btnGerar.addEventListener('click', function () {
+            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+            var pass = '';
+            for (var i = 0; i < 10; i++) {
+                pass += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            inputSenha.value = pass;
+            inputSenha.type = 'text';
+            iconOpen.classList.add('hidden');
+            iconClosed.classList.remove('hidden');
+        });
+    }
 })();
 </script>
 {% endblock %}

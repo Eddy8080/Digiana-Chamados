@@ -108,6 +108,88 @@
                 {% if field.errors %}<p class="text-xs text-rose-500 mt-1">{{ field.errors.as_text }}</p>{% endif %}
             </div>
 
+            {% elif field.html_name == 'tipo_senha' %}
+            <!-- ── Definição de Senha ── -->
+            <div class="pt-2 border-t border-slate-100 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Definição de Senha</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="tipo-senha-container">
+                        <label class="tipo-senha-card flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-blue-500 bg-blue-50/60" id="card-tipo-auto">
+                            <input type="radio" name="tipo_senha" value="auto" class="sr-only" checked>
+                            <div class="mt-0.5 w-4 h-4 rounded-full border-2 border-blue-600 bg-blue-600 flex items-center justify-center flex-shrink-0 radio-dot-wrap">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                            </div>
+                            <div>
+                                <span class="block text-sm font-bold text-slate-800">Automática por E-mail</span>
+                                <span class="block text-xs text-slate-500 mt-0.5">Gera senha temporária aleatória e envia por e-mail.</span>
+                            </div>
+                        </label>
+
+                        <label class="tipo-senha-card flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-slate-200 hover:border-slate-300" id="card-tipo-manual">
+                            <input type="radio" name="tipo_senha" value="manual" class="sr-only">
+                            <div class="mt-0.5 w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center flex-shrink-0 radio-dot-wrap">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white hidden"></span>
+                            </div>
+                            <div>
+                                <span class="block text-sm font-bold text-slate-800">Criar Senha na Hora</span>
+                                <span class="block text-xs text-slate-500 mt-0.5">Define a senha manualmente (troca no 1º login).</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Painel de Senha Manual -->
+                <div id="painel-senha-manual" class="hidden space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Senha Inicial Manual <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <input type="password" name="senha_manual" id="id_senha_manual"
+                                   class="w-full px-4 py-3 pr-24 border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition bg-white"
+                                   placeholder="Digite a senha inicial">
+                            <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <button type="button" id="btn-toggle-senha" title="Mostrar/Ocultar senha"
+                                        class="p-2 text-slate-400 hover:text-slate-600 rounded-lg transition">
+                                    <svg id="eye-icon-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                    </svg>
+                                    <svg id="eye-icon-closed" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 hidden">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                                    </svg>
+                                </button>
+                                <button type="button" id="btn-gerar-senha" title="Gerar senha aleatória"
+                                        class="px-2.5 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition">
+                                    Gerar
+                                </button>
+                            </div>
+                        </div>
+                        {% if form.senha_manual.errors %}
+                        <p class="text-xs text-rose-500 mt-1">{{ form.senha_manual.errors.as_text }}</p>
+                        {% endif %}
+                        <p class="text-xs text-slate-500 mt-1">O usuário será obrigado a trocar esta senha no primeiro login.</p>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200">
+                        <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                            <input type="checkbox" name="enviar_email_cadastro" id="id_enviar_email_cadastro" checked
+                                   class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-xs font-medium text-slate-700">Enviar e-mail para o usuário informando a criação do acesso</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Info para modo automático -->
+                <div id="painel-senha-auto" class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-0.5">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Uma <strong>senha temporária aleatória</strong> será gerada e enviada por e-mail ao usuário. No primeiro acesso, o sistema exigirá a troca de senha.</span>
+                </div>
+            </div>
+
+            {% elif field.html_name == 'senha_manual' or field.html_name == 'enviar_email_cadastro' %}
+            {# já renderizado dentro da seção tipo_senha #}
+
             {% else %}
             <!-- ── Campos de texto ── -->
             <div>
@@ -128,13 +210,6 @@
             {% endif %}
             {% endfor %}
 
-            <!-- Nota sobre senha automática -->
-            <div class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-0.5">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/>
-                </svg>
-                <span>Uma <strong>senha temporária aleatória</strong> será gerada e enviada por e-mail ao usuário. No primeiro acesso, o sistema exigirá a troca de senha.</span>
-            </div>
 
             <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
                 <a href="{% url 'dashboard' %}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
@@ -209,6 +284,113 @@
             activate(card);
         });
     });
+})();
+
+// ── Controle de Tipo de Senha (Automática x Manual) ──
+(function () {
+    var cardAuto     = document.getElementById('card-tipo-auto');
+    var cardManual   = document.getElementById('card-tipo-manual');
+    var radioAuto    = cardAuto ? cardAuto.querySelector('input[type="radio"]') : null;
+    var radioManual  = cardManual ? cardManual.querySelector('input[type="radio"]') : null;
+    var painelManual = document.getElementById('painel-senha-manual');
+    var painelAuto   = document.getElementById('painel-senha-auto');
+    var inputSenha   = document.getElementById('id_senha_manual');
+    var btnToggle    = document.getElementById('btn-toggle-senha');
+    var btnGerar     = document.getElementById('btn-gerar-senha');
+    var iconOpen     = document.getElementById('eye-icon-open');
+    var iconClosed   = document.getElementById('eye-icon-closed');
+
+    function setMode(mode) {
+        if (mode === 'manual') {
+            if (radioManual) radioManual.checked = true;
+            if (cardManual) {
+                cardManual.classList.add('border-blue-500', 'bg-blue-50/60');
+                cardManual.classList.remove('border-slate-200');
+                var dot = cardManual.querySelector('.radio-dot-wrap');
+                if (dot) {
+                    dot.classList.add('border-blue-600', 'bg-blue-600');
+                    dot.classList.remove('border-slate-300');
+                    var span = dot.querySelector('span');
+                    if (span) span.classList.remove('hidden');
+                }
+            }
+            if (cardAuto) {
+                cardAuto.classList.remove('border-blue-500', 'bg-blue-50/60');
+                cardAuto.classList.add('border-slate-200');
+                var dot = cardAuto.querySelector('.radio-dot-wrap');
+                if (dot) {
+                    dot.classList.remove('border-blue-600', 'bg-blue-600');
+                    dot.classList.add('border-slate-300');
+                    var span = dot.querySelector('span');
+                    if (span) span.classList.add('hidden');
+                }
+            }
+            if (painelManual) painelManual.classList.remove('hidden');
+            if (painelAuto) painelAuto.classList.add('hidden');
+            if (inputSenha) inputSenha.focus();
+        } else {
+            if (radioAuto) radioAuto.checked = true;
+            if (cardAuto) {
+                cardAuto.classList.add('border-blue-500', 'bg-blue-50/60');
+                cardAuto.classList.remove('border-slate-200');
+                var dot = cardAuto.querySelector('.radio-dot-wrap');
+                if (dot) {
+                    dot.classList.add('border-blue-600', 'bg-blue-600');
+                    dot.classList.remove('border-slate-300');
+                    var span = dot.querySelector('span');
+                    if (span) span.classList.remove('hidden');
+                }
+            }
+            if (cardManual) {
+                cardManual.classList.remove('border-blue-500', 'bg-blue-50/60');
+                cardManual.classList.add('border-slate-200');
+                var dot = cardManual.querySelector('.radio-dot-wrap');
+                if (dot) {
+                    dot.classList.remove('border-blue-600', 'bg-blue-600');
+                    dot.classList.add('border-slate-300');
+                    var span = dot.querySelector('span');
+                    if (span) span.classList.add('hidden');
+                }
+            }
+            if (painelManual) painelManual.classList.add('hidden');
+            if (painelAuto) painelAuto.classList.remove('hidden');
+        }
+    }
+
+    if (cardAuto) {
+        cardAuto.addEventListener('click', function () { setMode('auto'); });
+    }
+    if (cardManual) {
+        cardManual.addEventListener('click', function () { setMode('manual'); });
+    }
+
+    if (btnToggle && inputSenha) {
+        btnToggle.addEventListener('click', function () {
+            if (inputSenha.type === 'password') {
+                inputSenha.type = 'text';
+                if (iconOpen) iconOpen.classList.add('hidden');
+                if (iconClosed) iconClosed.classList.remove('hidden');
+            } else {
+                inputSenha.type = 'password';
+                if (iconOpen) iconOpen.classList.remove('hidden');
+                if (iconClosed) iconClosed.classList.add('hidden');
+            }
+        });
+    }
+
+    if (btnGerar && inputSenha) {
+        btnGerar.addEventListener('click', function () {
+            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+            var pass = '';
+            for (var i = 0; i < 10; i++) {
+                pass += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            inputSenha.value = pass;
+            inputSenha.type = 'text';
+            if (iconOpen) iconOpen.classList.add('hidden');
+            if (iconClosed) iconClosed.classList.remove('hidden');
+        });
+    }
 })();
 </script>
 {% endblock %}

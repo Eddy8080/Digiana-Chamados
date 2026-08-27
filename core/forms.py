@@ -43,9 +43,31 @@ class UserRegisterForm(forms.ModelForm):
         required=False, label="Foto de perfil",
         widget=forms.FileInput(attrs={'class': 'sr-only', 'id': 'id_foto', 'accept': 'image/*'}),
     )
+    tipo_senha = forms.ChoiceField(
+        choices=[
+            ('auto', 'Gerar senha temporária automática e enviar por e-mail'),
+            ('manual', 'Definir senha manualmente agora (troca no próximo login)'),
+        ],
+        initial='auto',
+        label="Definição de senha",
+        widget=forms.RadioSelect(),
+        required=False,
+    )
+    senha_manual = forms.CharField(
+        required=False,
+        label="Senha inicial manual",
+        widget=forms.PasswordInput(attrs={'class': _REG, 'placeholder': 'Digite a senha inicial'}),
+    )
+    enviar_email_cadastro = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Enviar e-mail com os dados de acesso",
+        widget=forms.CheckboxInput(attrs={'class': 'w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500'}),
+    )
 
     field_order = [
         'username', 'email', 'first_name', 'last_name', 'role', 'cliente',
+        'tipo_senha', 'senha_manual', 'enviar_email_cadastro',
         'celular', 'whatsapp', 'telefone_fixo', 'foto',
     ]
 
@@ -55,14 +77,33 @@ class UserRegisterForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        skip = {'email', 'first_name', 'last_name', 'role', 'celular', 'whatsapp', 'telefone_fixo', 'foto'}
+        skip = {
+            'email', 'first_name', 'last_name', 'role', 'celular', 'whatsapp',
+            'telefone_fixo', 'foto', 'tipo_senha', 'senha_manual', 'enviar_email_cadastro',
+        }
         for field in self.fields:
             if field not in skip:
                 self.fields[field].widget.attrs.update({'class': _REG})
 
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_senha = cleaned_data.get('tipo_senha', 'auto')
+        senha_manual = (cleaned_data.get('senha_manual') or '').strip()
+        if tipo_senha == 'manual':
+            if not senha_manual:
+                self.add_error('senha_manual', 'Informe a senha inicial do usuário.')
+            elif len(senha_manual) < 4:
+                self.add_error('senha_manual', 'A senha deve conter pelo menos 4 caracteres.')
+        return cleaned_data
+
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_unusable_password()
+        tipo_senha = self.cleaned_data.get('tipo_senha', 'auto')
+        senha_manual = (self.cleaned_data.get('senha_manual') or '').strip()
+        if tipo_senha == 'manual' and senha_manual:
+            user.set_password(senha_manual)
+        else:
+            user.set_unusable_password()
         role = self.cleaned_data.get('role', 'usr')
         if role in PerfilUsuario._ADMIN_ROLES:
             user.is_staff = True
@@ -75,12 +116,14 @@ class UserRegisterForm(forms.ModelForm):
                 celular=self.cleaned_data.get('celular') or None,
                 whatsapp=self.cleaned_data.get('whatsapp') or None,
                 telefone_fixo=self.cleaned_data.get('telefone_fixo') or None,
+                must_change_password=True,
             )
             foto = self.cleaned_data.get('foto')
             if foto:
                 perfil.foto = foto
                 perfil.save()
         return user
+
 
 
 class UsuarioEditForm(forms.ModelForm):
@@ -161,9 +204,15 @@ class UsuarioEditForm(forms.ModelForm):
             perfil.telefone_fixo   = self.cleaned_data.get('telefone_fixo') or None
             perfil.email_verificar = self.cleaned_data.get('email_verificar', False)
             foto = self.cleaned_data.get('foto')
+            foto_antiga_nome = None
+            storage = None
             if foto:
+                foto_antiga_nome = perfil.foto.name if perfil.foto else None
+                storage = perfil.foto.storage
                 perfil.foto = foto
             perfil.save()
+            if foto_antiga_nome:
+                storage.delete(foto_antiga_nome)
         return user
 
 
@@ -296,6 +345,18 @@ class ChamadoForm(forms.ModelForm):
             'status':    forms.Select(attrs={'class': _W_SELECT}),
             'prioridade':forms.Select(attrs={'class': _W_SELECT}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Com um único projeto cadastrado não há ambiguidade de escolha —
+        # pré-seleciona automaticamente para evitar que o usuário esqueça de
+        # tocar no dropdown e o formulário falhe silenciosamente por
+        # "Projeto: campo obrigatório" sem nenhum aviso visível no topo.
+        if not self.is_bound:
+            projetos_ids = list(Projeto.objects.values_list('id', flat=True)[:2])
+            if len(projetos_ids) == 1:
+                self.fields['projeto'].initial = projetos_ids[0]
+                self.fields['projeto'].empty_label = None
 
 
 class SistemaForm(forms.ModelForm):

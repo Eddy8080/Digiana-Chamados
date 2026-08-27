@@ -206,8 +206,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SITE_URL = os.environ.get('SITE_URL', f'https://{_railway_domain}' if _railway_domain else '')
 
-# Cloudinary — armazenamento de mídia persistente em produção
-# Variáveis definidas no Railway: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+# Cloudinary — opcional. Só necessário em PaaS de container efêmero (ex.: Railway),
+# onde o disco local não sobrevive a um redeploy. Em VPS própria (Docker com volume
+# persistente em /app/media), deixe CLOUDINARY_CLOUD_NAME em branco no .env para
+# usar o disco local — mais simples, sem dependência externa nem cota de storage.
 _cloudinary_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
 if _cloudinary_name:
     CLOUDINARY_STORAGE = {

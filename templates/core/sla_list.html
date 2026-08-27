@@ -67,7 +67,7 @@
                                 Editar
                             </a>
                             <form method="POST" action="{% url 'sla_delete' sla.pk %}" class="inline"
-                                  onsubmit="return confirm('Excluir SLA &quot;{{ sla.nome }}&quot;?');">
+                                  data-confirm-title="Excluir SLA &quot;{{ sla.nome }}&quot;?">
                                 {% csrf_token %}
                                 <button type="submit"
                                         class="px-3 py-1.5 text-xs font-semibold bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition">

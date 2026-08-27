@@ -20,6 +20,7 @@ from django.db.models import Count, Q, Prefetch
 from django.http import JsonResponse
 from django.core.mail import get_connection, EmailMessage
 from django.core.paginator import Paginator
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.csrf import csrf_exempt
@@ -165,40 +166,61 @@ def cadastro_view(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST, request.FILES)
         if form.is_valid():
+            tipo_senha = form.cleaned_data.get('tipo_senha', 'auto')
+            senha_manual = (form.cleaned_data.get('senha_manual') or '').strip()
+            enviar_email = form.cleaned_data.get('enviar_email_cadastro', True)
+
             user = form.save()
 
-            _alphabet = string.ascii_letters + string.digits + '!@#$'
-            temp_password = ''.join(secrets.choice(_alphabet) for _ in range(12))
-            user.set_password(temp_password)
-            user.save()
+            if tipo_senha == 'manual' and senha_manual:
+                user_password = senha_manual
+            else:
+                _alphabet = string.ascii_letters + string.digits + '!@#$'
+                user_password = ''.join(secrets.choice(_alphabet) for _ in range(12))
+                user.set_password(user_password)
+                user.save()
 
             nome_completo = user.get_full_name() or user.username
             link_sistema = _build_link(request, '/')
-            ok_email, erro_email = disparar_email(
-                f"[Digiana] Bem-vindo, {nome_completo}! Seu acesso foi criado.",
-                (
-                    f"Olá, {nome_completo}!\n\n"
-                    f"Seu acesso ao sistema Digiana foi criado.\n\n"
-                    f"Login:            {user.username}\n"
-                    f"Senha temporária: {temp_password}\n\n"
-                    f"Acesse o sistema pelo link abaixo e altere sua senha no primeiro login:\n"
-                    f"{link_sistema}\n\n"
-                    f"Esta é uma mensagem automática — não responda a este e-mail."
-                ),
-                [user.email],
-            ) if user.email else (False, "E-mail não informado para este usuário.")
 
-            if not ok_email:
-                user.perfil.email_verificar = True
-                user.perfil.save()
-                messages.warning(
-                    request,
-                    f"Usuário '{user.username}' cadastrado. "
-                    f"E-mail de boas-vindas não enviado — {erro_email} "
-                    f"O usuário foi marcado como 'E-mail a verificar'.",
-                )
+            if enviar_email and user.email:
+                ok_email, erro_email = disparar_email(
+                    f"[Digiana] Bem-vindo, {nome_completo}! Seu acesso foi criado.",
+                    (
+                        f"Olá, {nome_completo}!\n\n"
+                        f"Seu acesso ao sistema Digiana foi criado.\n\n"
+                        f"Login:            {user.username}\n"
+                        f"Senha temporária: {user_password}\n\n"
+                        f"Acesse o sistema pelo link abaixo e altere sua senha no primeiro login:\n"
+                        f"{link_sistema}\n\n"
+                        f"Esta é uma mensagem automática — não responda a este e-mail."
+                    ),
+                    [user.email],
+                ) if user.email else (False, "E-mail não informado para este usuário.")
+
+                if not ok_email:
+                    user.perfil.email_verificar = True
+                    user.perfil.save()
+                    messages.warning(
+                        request,
+                        f"Usuário '{user.username}' cadastrado. "
+                        f"E-mail de boas-vindas não enviado — {erro_email} "
+                        f"O usuário foi marcado como 'E-mail a verificar'.",
+                    )
+                else:
+                    messages.success(request, f"Usuário '{user.username}' cadastrado e e-mail de boas-vindas enviado!")
             else:
-                messages.success(request, f"Usuário '{user.username}' cadastrado e e-mail de boas-vindas enviado!")
+                if tipo_senha == 'manual':
+                    messages.success(
+                        request,
+                        f"Usuário '{user.username}' cadastrado com sucesso com a senha manual definida! "
+                        f"A troca de senha será exigida no primeiro login."
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Usuário '{user.username}' cadastrado com sucesso (senha temporária: {user_password})."
+                    )
 
             return redirect('usuarios_list')
     else:
@@ -206,17 +228,34 @@ def cadastro_view(request):
     return render(request, 'core/cadastro.html', {'form': form})
 
 
+
+def _dashboard_chamados_qs(user):
+    role = _role(user)
+    if role == 'usuario':
+        return Chamado.objects.filter(
+            Q(criado_por=user) | Q(observadores=user),
+            excluido=False,
+        ).distinct().order_by('-criado_em')
+    return Chamado.objects.filter(excluido=False).order_by('-criado_em')
+
+
+def _dashboard_projetos_sprint_qs(user):
+    role = _role(user)
+    if role == 'usuario':
+        try:
+            cli = user.perfil.cliente
+            qs = Projeto.objects.filter(cliente=cli, status_macro__in=['sprint', 'em_construcao', 'homologacao'])
+        except PerfilUsuario.DoesNotExist:
+            qs = Projeto.objects.none()
+    else:
+        qs = Projeto.objects.filter(status_macro__in=['sprint', 'em_construcao', 'homologacao'])
+    return qs.select_related('cliente', 'sistema', 'responsavel_lider').prefetch_related('chamados').order_by('ordem_posicao', '-criado_em')[:4]
+
+
 @login_required(login_url='login')
 def dashboard(request):
     role = _role(request.user)
-
-    if role == 'usuario':
-        chamados = Chamado.objects.filter(
-            Q(criado_por=request.user) | Q(observadores=request.user),
-            excluido=False,
-        ).distinct().order_by('-criado_em')
-    else:
-        chamados = Chamado.objects.filter(excluido=False).order_by('-criado_em')
+    chamados = _dashboard_chamados_qs(request.user)
 
     total_chamados = chamados.count()
     abertos = chamados.filter(status='aberto').count()
@@ -229,17 +268,7 @@ def dashboard(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Projetos em destaque para visão executiva da diretoria
-    if role == 'usuario':
-        try:
-            cli = request.user.perfil.cliente
-            projetos_sprint = Projeto.objects.filter(cliente=cli, status_macro__in=['sprint', 'em_construcao', 'homologacao'])
-        except PerfilUsuario.DoesNotExist:
-            projetos_sprint = Projeto.objects.none()
-    else:
-        projetos_sprint = Projeto.objects.filter(status_macro__in=['sprint', 'em_construcao', 'homologacao'])
-    
-    projetos_sprint = projetos_sprint.select_related('cliente', 'sistema', 'responsavel_lider').prefetch_related('chamados').order_by('ordem_posicao', '-criado_em')[:4]
+    projetos_sprint = _dashboard_projetos_sprint_qs(request.user)
 
     context = {
         'chamados':        page_obj,
@@ -251,7 +280,7 @@ def dashboard(request):
         'resolvidos':      resolvidos,
         'fechados':        fechados,
         'projetos_sprint': projetos_sprint,
-        'user_role':       _role(request.user),
+        'user_role':       role,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -259,21 +288,35 @@ def dashboard(request):
 @login_required(login_url='login')
 def dashboard_stats(request):
     role = _role(request.user)
-    qs = (
-        Chamado.objects.filter(
-            Q(criado_por=request.user) | Q(observadores=request.user),
-            excluido=False,
-        ).distinct()
-        if role == 'usuario'
-        else Chamado.objects.filter(excluido=False)
-    )
-    return JsonResponse({
+    qs = _dashboard_chamados_qs(request.user)
+
+    data = {
         'total':        qs.count(),
         'abertos':      qs.filter(status='aberto').count(),
         'em_progresso': qs.filter(status='em_progresso').count(),
         'pendentes':    qs.filter(status='pendente').count(),
         'resolvidos':   qs.filter(status='resolvido').count(),
-    })
+    }
+
+    # Só re-renderiza a tabela de "chamados recentes" quando o cliente está
+    # vendo a página 1 — evita substituir a visão de quem já paginou adiante.
+    page_number = request.GET.get('page') or '1'
+    if page_number == '1':
+        paginator = Paginator(qs, 10)
+        page_obj = paginator.get_page(1)
+        data['recentes_html'] = render_to_string('core/_dashboard_chamados_table.html', {
+            'chamados': page_obj,
+            'page_obj': page_obj,
+            'user_role': role,
+        }, request=request)
+
+    projetos_sprint = _dashboard_projetos_sprint_qs(request.user)
+    data['projetos_html'] = render_to_string('core/_dashboard_projetos_sprint.html', {
+        'projetos_sprint': projetos_sprint,
+        'user_role': role,
+    }, request=request)
+
+    return JsonResponse(data)
 
 
 @login_required(login_url='login')
@@ -1173,6 +1216,8 @@ def chamado_create(request):
 
             messages.success(request, "Chamado aberto com sucesso!")
             return redirect('dashboard')
+        else:
+            messages.error(request, "Não foi possível salvar o chamado — corrija os campos destacados abaixo.")
     else:
         form = ChamadoForm()
         _aplicar_restricoes_usuario(form, request.user)
@@ -1836,54 +1881,77 @@ def usuario_reset_senha(request, pk):
         messages.error(request, "Não é possível redefinir a senha de um superusuário.")
         return redirect('usuarios_list')
 
-    _alphabet = string.ascii_letters + string.digits + '!@#$'
-    temp_password = ''.join(secrets.choice(_alphabet) for _ in range(12))
-    usuario.set_password(temp_password)
+    tipo_reset = request.POST.get('tipo_reset', 'auto')
+    exigir_troca = request.POST.get('exigir_troca') in ('1', 'on', 'true', 'True', True)
+    notificar_email = request.POST.get('notificar_email') in ('1', 'on', 'true', 'True', True)
+    next_url = request.POST.get('next')
+    redirect_target = next_url if (next_url and next_url.startswith('/')) else 'usuarios_list'
+
+    if tipo_reset == 'manual':
+        nova_senha = request.POST.get('nova_senha', '').strip()
+        if not nova_senha:
+            messages.error(request, "A senha manual não pode estar em branco.")
+            return redirect(redirect_target)
+        if len(nova_senha) < 4:
+            messages.error(request, "A senha manual deve conter pelo menos 4 caracteres.")
+            return redirect(redirect_target)
+        senha_final = nova_senha
+    else:
+        _alphabet = string.ascii_letters + string.digits + '!@#$'
+        senha_final = ''.join(secrets.choice(_alphabet) for _ in range(12))
+
+    usuario.set_password(senha_final)
     usuario.save()
 
     try:
         perfil = usuario.perfil
-        perfil.must_change_password = True
-        perfil.save()
     except PerfilUsuario.DoesNotExist:
-        pass
+        perfil = PerfilUsuario.objects.create(user=usuario)
+    perfil.must_change_password = exigir_troca
+    perfil.save()
 
     nome_completo = usuario.get_full_name() or usuario.username
     resetado_por  = request.user.get_full_name() or request.user.username
+    link_sistema  = _build_link(request, '/')
 
-    ok_email, erro_email = disparar_email(
-        f"[Digiana] Sua senha foi redefinida — {nome_completo}",
-        (
-            f"Olá, {nome_completo}!\n\n"
-            f"Sua senha de acesso ao sistema Digiana foi redefinida pelo administrador {resetado_por}.\n\n"
-            f"Login:            {usuario.username}\n"
-            f"Senha temporária: {temp_password}\n\n"
-            f"Acesse o sistema e altere sua senha no próximo login. "
-            f"A troca de senha será exigida automaticamente.\n\n"
-            f"Esta é uma mensagem automática — não responda a este e-mail."
-        ),
-        [usuario.email],
-    ) if usuario.email else (False, "Usuário sem e-mail cadastrado.")
-
-    if not ok_email:
-        try:
-            usuario.perfil.email_verificar = True
-            usuario.perfil.save()
-        except Exception:
-            pass
-        messages.warning(
-            request,
-            f"Senha de '{usuario.username}' redefinida. "
-            f"E-mail não enviado — {erro_email} "
-            f"Informe a nova senha manualmente ao usuário.",
+    if notificar_email and usuario.email:
+        texto_troca = (
+            "Acesse o sistema e altere sua senha no próximo login. A troca de senha será exigida automaticamente."
+            if exigir_troca else
+            "Você já pode utilizar esta nova senha para acessar o sistema."
         )
+        ok_email, erro_email = disparar_email(
+            f"[Digiana] Sua senha foi redefinida — {nome_completo}",
+            (
+                f"Olá, {nome_completo}!\n\n"
+                f"Sua senha de acesso ao sistema Digiana foi redefinida pelo administrador {resetado_por}.\n\n"
+                f"Login:      {usuario.username}\n"
+                f"Nova senha: {senha_final}\n\n"
+                f"{texto_troca}\n\n"
+                f"Link de acesso: {link_sistema}\n\n"
+                f"Esta é uma mensagem automática — não responda a este e-mail."
+            ),
+            [usuario.email],
+        )
+        if not ok_email:
+            perfil.email_verificar = True
+            perfil.save()
+            messages.warning(
+                request,
+                f"Senha de '{usuario.username}' redefinida com sucesso. Porém, falha no envio do e-mail: {erro_email}. "
+                f"Informe a senha manualmente: {senha_final}"
+            )
+        else:
+            messages.success(request, f"Senha de '{usuario.username}' redefinida com sucesso e enviada para {usuario.email}.")
     else:
-        messages.success(
-            request,
-            f"Senha de '{usuario.username}' redefinida e e-mail enviado para {usuario.email}.",
-        )
+        if tipo_reset == 'manual':
+            troca_msg = " Troca obrigatória no próximo login ativada." if exigir_troca else ""
+            messages.success(request, f"Senha de '{usuario.username}' redefinida manualmente com sucesso!{troca_msg}")
+        else:
+            messages.success(request, f"Senha temporária gerada para '{usuario.username}': {senha_final}")
 
-    return redirect('usuarios_list')
+    return redirect(redirect_target)
+
 
 
 @login_required(login_url='login')
@@ -2038,8 +2106,12 @@ def perfil_foto_view(request):
     except PerfilUsuario.DoesNotExist:
         return JsonResponse({'ok': False, 'erro': 'Perfil não encontrado.'}, status=400)
     try:
+        foto_antiga_nome = perfil.foto.name if perfil.foto else None
+        storage = perfil.foto.storage
         perfil.foto = foto
         perfil.save()
+        if foto_antiga_nome:
+            storage.delete(foto_antiga_nome)
         return JsonResponse({'ok': True, 'url': perfil.foto.url})
     except Exception as e:
         logger.error("Erro ao salvar foto do perfil (user=%s): %s", request.user.username, e)
