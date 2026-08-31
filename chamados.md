@@ -45,9 +45,18 @@ erDiagram
     Projeto {
         int id PK
         int cliente_id FK
+        int sistema_id FK
+        int responsavel_lider_id FK
         string nome
         text descricao
+        string status_macro
+        string prioridade
+        int ordem_posicao
+        date data_inicio
+        date data_previsao_entrega
+        date data_conclusao
         datetime criado_em
+        datetime atualizado_em
     }
 
     Sistema {
@@ -141,6 +150,10 @@ erDiagram
     Cliente   ||--o{ PerfilUsuario   : "vincula usuário"
     Projeto   ||--|{ Chamado         : "contém"
 
+    %% ── Kanban de Projetos ──────────────────────────────────
+    User      ||--o{ Projeto         : "lidera (responsavel_lider)"
+    Sistema   ||--o{ Projeto         : "categoriza (opcional)"
+
     %% ── Vínculos opcionais do Chamado ──────────────────────
     Sistema      ||--o{ Chamado      : "afeta"
     SLADefinicao ||--o{ Chamado      : "define SLA"
@@ -165,7 +178,8 @@ erDiagram
 
 **Observações críticas do diagrama:**
 
-- **`User` é o hub central** — FK em 7 lugares (`criado_por`, `responsavel`, `excluido_por`, `observadores` M2M, `autor` de Resposta, `criado_por` de Anexo, `PerfilUsuario`). Toda feature nova que envolva usuário passa por ele.
+- **`User` é o hub central** — FK em 8 lugares (`criado_por`, `responsavel`, `excluido_por`, `observadores` M2M, `autor` de Resposta, `criado_por` de Anexo, `PerfilUsuario`, `responsavel_lider` de Projeto). Toda feature nova que envolva usuário passa por ele.
+- **`Projeto` ganhou um Kanban próprio** — `status_macro` (5 colunas), `prioridade`, `ordem_posicao`, `responsavel_lider`, `sistema` e 3 datas de ciclo de vida. Ver Implementação 49.
 - **`Chamado` é o modelo mais complexo** — 7 FKs, 1 M2M, 19 campos. Maior risco em migrations.
 - **`Resposta` tem auto-referência** — `resposta_pai_id` aponta para si mesmo; cuidado em queries recursivas.
 - **`ConfigurarEmail` é isolado** — nenhuma FK para outros modelos; configuração pura.
@@ -186,6 +200,8 @@ Cliente  ||--o{ Hardware : "possui"
 User     ||--o{ Hardware : "guardião"
 ```
 
+> ⚠️ **Atenção ao numerar as migrations quando este estudo for implementado.** As migrations `0025` e `0026` já foram consumidas pela Implementação 49 (Kanban de Projetos) — a próxima migration livre no repositório é `0027`. Os nomes `0025_hardware.py` / `0026_chamado_hardware_tipo.py` citados neste estudo são apenas ilustrativos e precisam ser renumerados no momento da implementação real.
+
 ---
 
 ---
@@ -198,7 +214,7 @@ Sistema web para registro e acompanhamento de chamados de suporte a sistemas de 
 **Logo navbar:** `Abertura de Chamados` (texto simples, classe `header-logo-text`)  
 **Logo tela de login:** a palavra `Login` exibida com efeito glow neon ciano pulsante (classe `login-logo-text .ia-glow`)  
 **Animação CSS `ia-glow`:** ciano pulsante — dark mode `#00f0ff` / light mode `#0090bb` — keyframe `ia-pulse` e `ia-pulse-light` em `base.html`
-**Ambiente atual:** o sistema já está em produção no Railway; os commits atualizam o código local e o repositório, e o deploy depende do `push` para o branch configurado.
+**Ambiente atual:** o sistema já está em produção no Railway; os commits atualizam o código local e o repositório, e o deploy depende do `push` para o branch configurado. Há também containerização Docker completa para desenvolvimento local via Docker Desktop (ver Implementação 50); o estudo de migração/deploy autônomo contempla infraestrutura VPS na Oracle Cloud (OCI) com Linux Ubuntu 24.04 LTS (2 OCPUs e 12 GB de RAM).
 
 ---
 
@@ -263,23 +279,33 @@ chamados/
 │       ├── configurar_email_form.html
 │       ├── relatorios.html      # ITIL 4: MTTR, distribuições, tendências, SLA compliance
 │       ├── sla_list.html
-│       └── sla_form.html
+│       ├── sla_form.html
+│       ├── projetos_kanban.html           # Board Kanban de projetos (5 colunas)
+│       ├── _dashboard_chamados_table.html # Partial — tabela de chamados recentes (SPA/polling)
+│       └── _dashboard_projetos_sprint.html# Partial — card de projetos em sprint (SPA/polling)
 ├── static/
 │   └── img/
 │       ├── Dark.png             # Banner da tela de login (dark mode)
 │       └── Light.png            # Banner da tela de login (light mode)
 ├── fixtures_inicial.json        # Dados de dev (não carregar em produção)
 ├── CHECKLIST_RAILWAY.md         # Checklist de deploy Railway
-├── Procfile                     # Comando de inicialização Railway
-├── requirements.txt             # 12 dependências com versões exatas
+├── Procfile                     # Comando de inicialização Railway (deploy Railway/Nixpacks)
+├── Dockerfile                   # Build multi-stage p/ deploy em VPS/Docker (ver Impl. 50)
+├── docker-compose.yml           # App + PostgreSQL, p/ Docker Desktop/VPS (ver Impl. 50)
+├── .dockerignore
+├── .env.example                 # Template de variáveis de ambiente (Docker/VPS)
+├── requirements.txt             # 11 dependências com versões exatas
 ├── .python-version              # 3.11
 ├── db.sqlite3                   # Banco local (não commitar)
+├── chamados.html                # Versão HTML deste doc (regenerar após editar este arquivo)
 └── manage.py
 ```
 
 ---
 
 ## Histórico de Implementações
+
+> A numeração de "Implementação N" reflete a ordem em que cada mudança foi registrada neste documento, agrupada por tema (ex.: as seções de e-mail/Railway ficam juntas). Não é um índice cronológico estrito de commits — para a ordem real de aplicação no banco, use a tabela **Migrações**.
 
 ### Implementação 1 — Estrutura Base e CRUD Inicial
 
@@ -1262,12 +1288,12 @@ path('api/dashboard-stats/', views.dashboard_stats, name='dashboard_stats'),
 - Exibe horário da última atualização ("Atualizado às HH:MM:SS")
 - Falhas de rede são silenciadas — não quebra a UI
 
-**Relógio e data em tempo real** (Impl. 27/28 — bloco IIFE separado, sem rede):
+**Relógio e data em tempo real** (Impl. 27 — bloco IIFE separado, sem rede):
 - `#live-date` (data `dd/mm/aaaa`) + `#last-updated` (hora `HH:MM:SS`) dentro do `#live-badge`
-- `live-badge` sempre visível (`inline-flex`) — não depende mais do primeiro poll
+- `live-badge` sempre visível (`inline-flex`) — não depende do primeiro poll
 - `setInterval` de 1 s com `new Date()` — `toLocaleDateString` e `toLocaleTimeString` pt-BR
-- `poll()` simplificado: não reescreve mais o horário nem manipula visibilidade do badge
-- Fonte do horário: S.O. do navegador — ver Impl. 28 para estudo de migração ao horário do servidor
+- `poll()` não mexe no horário nem na visibilidade do badge — responsabilidades separadas
+- Fonte do horário: S.O. do navegador — ver Impl. 27 para o estudo de migração ao horário do servidor
 
 **RBAC preservado:** o endpoint respeita o mesmo filtro da view `dashboard` (usuário vê só os próprios chamados).
 
@@ -1541,13 +1567,9 @@ if role not in ('admin', 'dev') and chamado.criado_por != request.user and not i
 
 ### Implementação 27 — Relógio e Data em Tempo Real no Dashboard
 
-**Motivação:** O topo do dashboard não exibia data/hora em tempo real. O usuário queria ver horário e data sempre atualizados, sem recarregar a página.
+**Motivação:** O topo do dashboard não exibia data/hora em tempo real. O usuário queria ver horário e data sempre atualizados, sem recarregar a página, em um único indicador visual junto ao badge "ao vivo" do polling (Impl. 24).
 
-**Estado final após correção (Impl. 28):**
-
-Durante o desenvolvimento foi identificado que a implementação inicial criava dois elementos de tempo simultâneos (`#relogio` e `#last-updated`), aparecendo como dois relógios lado a lado. A correção unificou tudo em um único grupo visual.
-
-**HTML resultante** (topo do dashboard, antes do botão "Novo Chamado"):
+**HTML** (topo do dashboard, antes do botão "Novo Chamado"):
 
 ```html
 <span id="live-badge" class="inline-flex items-center gap-2 text-sm font-medium text-slate-400">
@@ -1595,18 +1617,7 @@ Dashboard              🟢  09/06/2026  |  14:35:22   [+ Novo Chamado]
 Acompanhe e gerencie...
 ```
 
-**Fonte do horário:** S.O. do navegador do usuário via `new Date()` — sem requisição de rede. Ver Impl. 28 para análise completa e plano de migração para horário do servidor.
-
----
-
-### Implementação 28 — Correção do Relógio Duplo + Data + Estudo de Horário do Servidor
-
-**Correções aplicadas:**
-
-1. Removido `<span id="relogio">` (elemento duplicado criado na Impl. 27 inicial)
-2. `live-badge` passou de `hidden` para `inline-flex` — visível desde o carregamento, sem depender do primeiro poll
-3. Data `dd/mm/aaaa` adicionada ao lado do horário via `#live-date`
-4. `poll()` simplificado — não reescreve mais o horário nem manipula visibilidade do badge
+**Fonte do horário:** S.O. do navegador do usuário via `new Date()` — sem requisição de rede. `live-badge` é `inline-flex` desde o carregamento (não depende do primeiro poll); `poll()` (Impl. 24) não reescreve o horário nem manipula a visibilidade do badge — responsabilidades separadas entre o IIFE do relógio (1 s) e o IIFE do polling (15 s).
 
 **Estudo: horário do cliente (`new Date()`) vs horário do servidor**
 
@@ -1815,23 +1826,15 @@ Caixa azul antes dos botões de submit:
 
 ---
 
-### Implementação 30 — Correção do Botão "Salvar Chamado" (novalidate)
+### Implementação 30 — `novalidate` no Formulário de Chamado
 
-**Problema:** O botão "Salvar Chamado" em `chamado_form.html` não fazia nada ao ser clicado.
-
-**Causa raiz:** O CKEditor substitui o `<textarea id="id_descricao">` pelo seu editor rico e o oculta com `display: none`. O navegador executa a validação HTML5 *antes* do evento `submit`. Como o textarea está oculto e vazio (`required`), o browser detecta falha de validação, tenta exibir o tooltip de erro em um elemento invisível, falha silenciosamente e bloqueia o envio. O handler `submit` que sincroniza o conteúdo do CKEditor para o textarea nunca chega a rodar — círculo vicioso.
-
-**Solução:** Adicionado atributo `novalidate` ao `<form>` de `chamado_form.html`. O Django já realiza toda a validação no servidor; a validação HTML5 nativa é redundante e incompatível com editores ricos que escondem o campo original.
+**Comportamento atual:** o `<form>` de `chamado_form.html` usa o atributo `novalidate`:
 
 ```html
-<!-- antes -->
-<form method="POST" enctype="multipart/form-data" class="space-y-5" id="chamado-form">
-
-<!-- depois -->
 <form method="POST" enctype="multipart/form-data" novalidate class="space-y-5" id="chamado-form">
 ```
 
-**Arquivo alterado:** `templates/core/chamado_form.html` — linha do `<form>`.
+**Por quê:** o CKEditor substitui o `<textarea id="id_descricao">` pelo seu editor rico e o oculta com `display: none`. A validação HTML5 nativa do browser roda *antes* do evento `submit` e, como o textarea `required` está oculto e vazio, o browser bloqueia o envio silenciosamente antes que o handler que sincroniza o conteúdo do CKEditor para o textarea chegue a rodar. `novalidate` desativa essa validação nativa — o Django já valida tudo no servidor via `form.is_valid()`, então a checagem HTML5 é redundante e incompatível com editores ricos que escondem o campo original. A mesma razão se aplica ao `<form id="detail-form">` de `chamado_detail.html` (Impl. 31).
 
 ---
 
@@ -1915,29 +1918,22 @@ A URL `/chamados/<pk>/editar/` e a view `chamado_update` continuam existindo no 
 
 ---
 
-### Implementação 32 — Correção "Salvar Alterações" (forms aninhados)
+### Implementação 32 — Estrutura de Forms em `chamado_detail.html`
 
-**Problema:** O botão "Salvar Alterações" na tela `chamado_detail` não fazia nada ao ser clicado. Nenhuma mensagem de erro, nenhum redirecionamento — a página simplesmente recarregava sem salvar.
+**Regra estrutural:** nenhum `<form>` fica aninhado dentro de outro em `chamado_detail.html`. O form de reabrir (`action=".../reabrir/"`) e o form de exclusão (`action=".../excluir/"`) são elementos irmãos, posicionados *antes* da abertura do `<form id="detail-form">` — nunca dentro dele.
 
-**Causa raiz:** O `<form id="detail-form">` envolvia toda a página. Dentro dele estavam o form de reabrir (`<form method="POST" action=".../reabrir/">`) e o form de exclusão (`<form method="POST" action=".../excluir/">`). O HTML5 proíbe forms aninhados: ao encontrar o primeiro `<form>` filho, o parser do browser **fecha implicitamente** o `<form>` pai. Na prática, o `detail-form` era encerrado logo na abertura do primeiro form auxiliar. Todos os campos que vinham depois — `descricao`, `status`, `prioridade`, `responsavel`, `observadores` — ficavam **fora** do form efetivo no DOM. O Django recebia um POST incompleto, `form.is_valid()` falhava (campos obrigatórios ausentes), e a view recarregava sem salvar e sem exibir erro (o caminho de falha silencioso de `is_valid()`).
+**Por quê:** o HTML5 proíbe forms aninhados — ao encontrar o primeiro `<form>` filho, o parser do browser fecha implicitamente o `<form>` pai. Se um form auxiliar (reabrir/excluir) estivesse dentro de `detail-form`, o browser encerraria `detail-form` na abertura desse form filho, deixando os campos seguintes (`descricao`, `status`, `prioridade`, `responsavel`, `observadores`) fora do form efetivo no DOM — o POST chegaria incompleto ao Django e `form.is_valid()` falharia sem nenhuma mensagem visível (o form reconstrói a partir da instância e a página parece um GET normal).
 
-**Solução — três mudanças estruturais em `chamado_detail.html`:**
+**Consequências dessa regra na implementação:**
 
-1. **Forms auxiliares movidos para fora do `detail-form`** — o form de reabrir e o form de exclusão foram posicionados como elementos irmãos, *antes* da abertura do `<form id="detail-form">`. Nenhum form fica mais aninhado dentro de outro.
-
-2. **Atributo `form="detail-form"` nos campos do cabeçalho** — o campo `titulo` (input inline no header) e o botão "Salvar Alterações" estão no cabeçalho, fora da posição DOM do `<form id="detail-form">`. O atributo HTML5 `form="<id>"` associa qualquer input ou button a um form pelo id, independentemente de onde estejam no DOM:
+1. **Atributo `form="detail-form"`** nos campos do cabeçalho — o campo `titulo` (input inline) e o botão "Salvar Alterações" ficam fisicamente no cabeçalho, fora da posição DOM do `<form id="detail-form">`. O atributo HTML5 `form="<id>"` associa qualquer input ou button a um form pelo id, independentemente de onde estejam no DOM:
 
 ```html
-<!-- título no header, fora da tag <form>, associado via form= -->
 <input type="text" name="titulo" form="detail-form" ...>
-
-<!-- botão salvar no header -->
 <button type="submit" form="detail-form" ...>Salvar Alterações</button>
 ```
 
-3. **`form.fields.status` em vez de `form.status` no template** — a condição `{% if can_edit and form.status %}` foi corrigida para `{% if can_edit and form.fields.status %}`. O accessor `form.status` retorna um `BoundField` que nunca é falsy mesmo quando o campo foi removido de `form.fields` pelo `_aplicar_restricoes_usuario`. A lookup explícita em `form.fields` (dicionário) retorna `KeyError`/`None` corretamente quando o campo foi removido.
-
-**Por que não houve mensagem de erro?** O fluxo `POST` na view caia em `form.is_valid() == False` e entrava no branch `else: form = ChamadoForm(instance=chamado)` — reconstruindo o form a partir da instância, re-renderizando a página. Visualmente idêntico a um GET normal. Sem `messages.error`, o usuário não recebia nenhum feedback.
+2. **`form.fields.status` em vez de `form.status` no template** — a condição usada é `{% if can_edit and form.fields.status %}`, nunca `{% if can_edit and form.status %}`. O accessor `form.status` retorna um `BoundField` que nunca é falsy, mesmo quando o campo foi removido de `form.fields` pelo `_aplicar_restricoes_usuario`. A lookup em `form.fields` (dicionário) é a única forma correta de detectar campo removido.
 
 ---
 
@@ -2615,7 +2611,7 @@ Nove modelos:
 |---|---|
 | `Sistema` | `nome`, `descricao`, `ativo`, `criado_em` |
 | `Cliente` | `nome`, `cpf_cnpj`, `email`, `telefone`, `criado_em` |
-| `Projeto` | `cliente` (FK), `nome`, `descricao`, `criado_em` |
+| `Projeto` | `cliente` (FK), `sistema` (FK, opcional), `nome`, `descricao`, `status_macro` (Kanban, 5 estados), `prioridade`, `responsavel_lider` (FK User, opcional), `ordem_posicao`, `data_inicio`, `data_previsao_entrega`, `data_conclusao`, `criado_em`, `atualizado_em` — + properties `total_chamados`, `chamados_concluidos`, `chamados_abertos`, `progresso_percentual` (ver Impl. 49) |
 | `SLADefinicao` | `nome`, `descricao`, `prioridade` (unique), `tempo_limite_horas` (FloatField, horas úteis), `cor_classe` (Tailwind), `ativo`, `criado_em`, `atualizado_em` |
 | `Chamado` | `projeto`, `sistema` (FK, opcional), `sla` (FK SLADefinicao, opcional), `titulo`, `descricao`, `status`, `prioridade`, `responsavel`, `observadores` (M2M), `criado_por`, `criado_em`, `atualizado_em`, `fechado_em`, `reaberto_em`, `reaberto_count`, `excluido`, `excluido_em`, `excluido_por` (FK, SET_NULL), `motivo_exclusao` |
 | `PerfilUsuario` | `user` (OneToOne), `role`, `must_change_password`, `cliente` (FK, opcional), `celular`, `whatsapp`, `telefone_fixo`, `email_verificar`, `foto` (ImageField, opcional) |
@@ -2659,6 +2655,8 @@ Nove modelos:
 | `projeto_create` | GET/POST | Admin, Gestor, Dev |
 | `projeto_update` | GET/POST | Admin, Gestor, Dev |
 | `projeto_delete` | POST | Somente admin |
+| `projetos_kanban` | GET | Autenticado — usuário vê só projetos do próprio `perfil.cliente`; filtros por cliente/sistema/responsável/busca (ver Impl. 49) |
+| `projeto_mover_kanban` | POST (AJAX, `@csrf_exempt`) | Todos exceto `usuario` — atualiza `status_macro`/`ordem_posicao` via drag-and-drop |
 | `chamados_list` | GET | Todos (usuário: criados por si + observados, paginado 20/pág) |
 | `chamado_create` | GET/POST | Todos autenticados |
 | `chamado_detail` | GET/POST | Todos (usuário: criados por si + observados) — GET: visualização; POST: salva edição se `can_edit=True` |
@@ -2734,6 +2732,8 @@ Nove modelos:
 
 # Projetos (admin, gestor, dev)
 /projetos/                       → projetos_list
+/projetos/kanban/                → projetos_kanban        (todos exceto usuario veem tudo; usuario só o próprio cliente)
+/projetos/kanban/mover/          → projeto_mover_kanban   (POST, AJAX, drag-and-drop)
 /projetos/novo/                  → projeto_create
 /projetos/<pk>/editar/           → projeto_update
 /projetos/<pk>/excluir/          → projeto_delete        (admin only)
@@ -2845,6 +2845,10 @@ CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
 | `0022_chamado_excluido_chamado_excluido_em_and_more.py` | Adiciona `fechado_em`, `excluido`, `excluido_em`, `excluido_por` (FK), `motivo_exclusao` ao `Chamado`; `RunPython` retroativo para preencher `fechado_em` em chamados já fechados |
 | `0023_auto_20260616_0951.py` | Adiciona `reaberto_em` (DateTimeField nullable) e `reaberto_count` (IntegerField default=0) ao `Chamado` — base para métrica de reincidência nos relatórios |
 | `0024_auto_20260616_1005.py` | Cria modelo `SLADefinicao`; adiciona FK `sla` (SET_NULL, nullable) ao `Chamado` |
+| `0025_alter_projeto_options_projeto_atualizado_em_and_more.py` | Adiciona `sistema` (FK opcional), `status_macro`, `prioridade`, `responsavel_lider` (FK opcional), `ordem_posicao`, `data_inicio`, `data_previsao_entrega`, `data_conclusao`, `atualizado_em` ao `Projeto`; altera `Meta.ordering` para `['ordem_posicao', '-criado_em']` — base do Kanban (Impl. 49) |
+| `0026_alter_projeto_status_macro.py` | Ajusta os labels dos `choices` de `status_macro` (remove emojis dos rótulos, ex. `'📋 Backlog'` → `'Backlog Geral'`) |
+
+**Próxima migration livre:** `0027`.
 
 ---
 
@@ -3206,31 +3210,15 @@ O envio de e-mail via `smtp.zoho.com:465` funciona perfeitamente no ambiente de 
 | Políticas da organização Zoho | Descartado — mesma razão |
 | Porta 465 SSL → 587 TLS | Não testado (mesmo range de IP, provável mesmo bloqueio) |
 
-### Solução pendente — Zoho ZeptoMail
+### Caminho adotado — Brevo (não Zoho ZeptoMail)
 
-O **Zoho ZeptoMail** é o produto da própria Zoho criado especificamente para envio de e-mail transacional a partir de aplicações/servidores hospedados em cloud. Usa infraestrutura diferente do Zoho Mail pessoal/corporativo e não sofre o bloqueio de IP.
-
-| Item | Valor |
-|---|---|
-| Produto | Zoho ZeptoMail |
-| Site | `zeptomail.zoho.com` |
-| Plano gratuito | 10.000 e-mails/mês |
-| Servidor SMTP | `smtp.zeptomail.com` |
-| Porta | 587 (TLS) |
-| Autenticação | Token de API gerado no painel ZeptoMail |
-
-**Passos para implementar:**
-1. Criar conta em `zeptomail.zoho.com` (gratuito)
-2. Adicionar e verificar o domínio `anagma.com.br`
-3. Gerar o token SMTP
-4. Atualizar a configuração SMTP no sistema: servidor `smtp.zeptomail.com`, porta `587`, TLS habilitado, usuário e senha gerados pelo ZeptoMail
-5. Cadastrar a nova configuração no painel do sistema ou por comando idempotente, sem armazenar senha/token em fixture
-
-**Alternativa:** Brevo (antigo Sendinblue) — 300 e-mails/dia grátis, SMTP `smtp-relay.brevo.com:587`, funciona em cloud sem restrição.
+Duas alternativas cloud-friendly foram avaliadas: **Zoho ZeptoMail** (produto da própria Zoho para e-mail transacional, `smtp.zeptomail.com:587`, não sofre o bloqueio de IP do Zoho Mail comum) e **Brevo** (ex-Sendinblue, 300 e-mails/dia grátis). O sistema adotou **Brevo**, e não por SMTP (a porta SMTP do Brevo também sofria timeout no Railway) e sim pela **API HTTP** — ver Implementações 29 e 30 para a configuração multi-SMTP com toggle e o modo API HTTP, e a seção "Passo a Passo Correto — Brevo API HTTP no Railway" para o procedimento de configuração ponta a ponta. ZeptoMail permanece como alternativa não explorada caso o Brevo deixe de atender.
 
 ---
 
-## Implementação 29 — Multi-SMTP com Toggle de Ativação (Zoho + Brevo)
+## Implementação 47 — Multi-SMTP com Toggle de Ativação (Zoho + Brevo)
+
+> Nota de numeração: esta feature corresponde às migrations `0018`–`0021`, cronologicamente anteriores às migrations `0022`–`0024` das Implementações 42–46. Está numerada 47 (e não entre 41 e 42) porque foi documentada junto com o restante do estudo de e-mail/Railway — ver nota no topo de "Histórico de Implementações".
 
 ### O que foi construído
 
@@ -3274,7 +3262,7 @@ path('configuracao-email/<int:pk>/toggle/', views.configurar_email_toggle, name=
 
 ---
 
-## Implementação 30 — Envio de E-mail via API HTTP do Brevo
+## Implementação 48 — Envio de E-mail via API HTTP do Brevo
 
 ### Contexto e problema
 
@@ -3523,7 +3511,7 @@ Quando o projeto justificar o custo do plano Pro, o upgrade elimina essa manuten
 
 ---
 
-## Implementação 42 — Soft Delete de Chamados (Etapas 4–8)
+## Implementação 42 — Soft Delete de Chamados
 
 ### Contexto
 
@@ -4516,9 +4504,9 @@ Adicionar após o campo `sistema`, com lógica JS:
 #### `chamados_list.html` — coluna e filtro de tipo
 
 - Nova coluna "Tipo" com badge colorido:
-  - `software` → `bg-blue-50 text-blue-700`
-  - `hardware` → `bg-orange-50 text-orange-700`
-  - `geral` → `bg-slate-50 text-slate-500`
+    - `software` → `bg-blue-50 text-blue-700`
+    - `hardware` → `bg-orange-50 text-orange-700`
+    - `geral` → `bg-slate-50 text-slate-500`
 - Novo `<select>` de tipo na barra de filtros, ao lado do filtro de status
 
 ---
@@ -4830,8 +4818,8 @@ O DNS de `anagma.com.br` pode estar em dois lugares:
 1. Acessar `registro.br` → logar com CPF/CNPJ do titular
 2. Abrir `anagma.com.br` → aba DNS
 3. Verificar os **servidores de nome** (`ns1.xxx`, `ns2.xxx`):
-   - Se forem do Registro.br → configurar ali mesmo
-   - Se forem de outro provedor → logar nesse provedor e adicionar os registros lá
+    - Se forem do Registro.br → configurar ali mesmo
+    - Se forem de outro provedor → logar nesse provedor e adicionar os registros lá
 
 ---
 
@@ -4859,163 +4847,182 @@ O DNS de `anagma.com.br` pode estar em dois lugares:
 
 ---
 
-## Estudo — Arquitetura de Containerização e Deploy Docker para VPS
+## Implementação 49 — Kanban de Projetos e Expansão do Modelo `Projeto`
 
-### Contexto e Motivação
-Atualmente, o projeto `Digiana-Chamados` utiliza build baseado em **Nixpacks/Procfile** voltado a plataformas PaaS (como Railway). Para viabilizar a migração ou deploy autônomo em servidores dedicados/VPS (ex: DigitalOcean, Hetzner, AWS EC2, Linode, VPS própria Linux), é essencial estruturar uma **containerização profissional com Docker**, seguindo as melhores práticas de engenharia de software (Multi-stage build, segurança com non-root user, imagens enxutas e healthchecks).
+**Motivação:** o cadastro de `Projeto` era um registro raso (nome, descrição, cliente) sem noção de andamento. Diretoria e gestão precisavam de uma visão executiva do pipeline de projetos — o que está em backlog, em sprint, em construção, em homologação ou já entregue — sem depender de planilhas externas.
 
----
+### Modelo `Projeto` expandido (migrations `0025`, `0026`)
 
-### Diagnóstico do Estado Atual vs. Padrão Recomendado
+```python
+class Projeto(models.Model):
+    STATUS_CHOICES = [
+        ('backlog', 'Backlog Geral'),
+        ('sprint', 'Sprint Atual'),
+        ('em_construcao', 'Em Construção'),
+        ('homologacao', 'Homologação / Testes'),
+        ('concluido', 'Em Produção / Concluído'),
+    ]
+    PRIORIDADE_CHOICES = [
+        ('baixa', 'Baixa'), ('media', 'Média'), ('alta', 'Alta'), ('critica', 'Crítica'),
+    ]
 
-| Componente | Estado Atual (Railway/Nixpacks) | Padrão Alvo Docker (VPS) |
-|---|---|---|
-| **Definição de Imagem** | `nixpacks.toml` / `Procfile` | `Dockerfile` com Multi-stage build |
-| **Tamanho Estimado** | ~1 GB a 1.4 GB (imagem genérica/runtime completo) | ~150 MB a 200 MB (Python Alpine / Slim otimizado) |
-| **Segurança do Container** | Usuário root padrão | Usuário restrito sem privilégios (`appuser:appgroup`) |
-| **Camadas de Cache** | Automático via Nixpack | Cópia granular de dependências (`requirements.txt`) antes do código |
-| **Orquestração** | PaaS Cloud | `docker-compose.yml` (App + PostgreSQL + Nginx + Certbot) |
-| **Monitoramento de Saúde** | Check HTTP externo PaaS | `HEALTHCHECK` nativo dentro do container |
-| **Arquivos Ignorados** | Apenas `.gitignore` | `.dockerignore` dedicado evitando cache local e segredos |
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='projetos')
+    sistema = models.ForeignKey('Sistema', on_delete=models.SET_NULL, null=True, blank=True, related_name='projetos')
+    nome = models.CharField(max_length=150)
+    descricao = models.TextField(blank=True, null=True)
+    status_macro = models.CharField(max_length=20, choices=STATUS_CHOICES, default='backlog', verbose_name='Status no Kanban')
+    prioridade = models.CharField(max_length=10, choices=PRIORIDADE_CHOICES, default='media', verbose_name='Prioridade')
+    responsavel_lider = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='projetos_liderados', verbose_name='Líder / Responsável')
+    ordem_posicao = models.IntegerField(default=0, verbose_name='Posição na Coluna')
+    data_inicio = models.DateField(null=True, blank=True)
+    data_previsao_entrega = models.DateField(null=True, blank=True)
+    data_conclusao = models.DateField(null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
----
+    class Meta:
+        ordering = ['ordem_posicao', '-criado_em']
 
-### Princípios de Otimização Aplicados
+    @property
+    def total_chamados(self):
+        return self.chamados.filter(excluido=False).count()
 
-1. **Separação clara entre Build e Runtime (Multi-stage build):**
-   - **Stage 1 (Builder):** Instala compiladores, headers e ferramentas C (`gcc`, `libpq-dev`, `python-dev`) para compilar dependências Python (*wheels*).
-   - **Stage 2 (Runtime Final):** Utiliza imagem base mínima (ex.: `python:3.11-slim`), copia apenas as *wheels* compiladas e pacotes de runtime (`libpq`), descartando ferramentas de compilação desnecessárias.
-2. **Aproveitamento Máximo do Cache de Camadas (*Layer Caching*):**
-   - O arquivo `requirements.txt` é copiado e instalado antes de copiar o código-fonte. Assim, alterações de regras de negócio ou templates não invalidam o cache das bibliotecas Python.
-3. **Execução Segura com Usuário Não-Root (`non-root user`):**
-   - Criação de usuário de sistema com UID/GID fixo para rodar a aplicação, prevenindo escalada de privilégios em caso de vulnerabilidades na aplicação.
-4. **Resiliência com `HEALTHCHECK`:**
-   - Instrução nativa no container consultando endpoint de ping/health via `curl`, permitindo auto-recuperação pelo Docker Daemon ou orquestrador.
+    @property
+    def chamados_concluidos(self):
+        return self.chamados.filter(excluido=False, status__in=['resolvido', 'fechado']).count()
 
----
+    @property
+    def chamados_abertos(self):
+        return self.chamados.filter(excluido=False, status__in=['aberto', 'em_progresso', 'pendente']).count()
 
-### Arquitetura de Arquivos Proposta para a VPS
-
-#### 1. `.dockerignore`
-```dockerignore
-.git
-.gitignore
-.env
-.venv
-venv/
-env/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.antigravitycli/
-.gemini/
-*.sqlite3
-media/
-staticfiles/
-node_modules/
-image.png
-chamados.html
-chamados.md
+    @property
+    def progresso_percentual(self):
+        total = self.total_chamados
+        if total == 0:
+            return 100 if self.status_macro == 'concluido' else 0
+        return int((self.chamados_concluidos / total) * 100)
 ```
 
-#### 2. `Dockerfile` (Otimizado / Multi-Stage)
+`sistema`, `responsavel_lider` e as 3 datas são `null=True, blank=True` — zero impacto em projetos já cadastrados. `progresso_percentual` deriva sempre dos `Chamado`s vinculados (não é um campo armazenado), então nunca fica dessincronizado.
+
+### View `projetos_kanban` e endpoint `projeto_mover_kanban`
+
+`projetos_kanban` (GET, `/projetos/kanban/`) agrupa os projetos nas 5 colunas de `status_macro`, com filtros opcionais por cliente, sistema, responsável e busca textual. Usuário com role `usuario` só vê projetos do próprio `perfil.cliente`.
+
+`projeto_mover_kanban` (POST/AJAX, `/projetos/kanban/mover/`, `@csrf_exempt`) recebe `{projeto_id, novo_status, nova_ordem}` via JSON e persiste o drag-and-drop do board:
+
+```python
+projeto.status_macro = novo_status
+projeto.ordem_posicao = int(nova_ordem)
+if novo_status == 'concluido' and not projeto.data_conclusao:
+    projeto.data_conclusao = timezone.now().date()
+projeto.save()
+```
+
+`data_conclusao` é preenchida automaticamente na primeira vez que o projeto entra na coluna "Concluído" — não é editável manualmente no formulário padrão.
+
+Acesso restrito: `role == 'usuario'` recebe `403` no endpoint de mover — o Kanban é ferramenta de gestão/execução, não de acompanhamento passivo.
+
+### Template `projetos_kanban.html`
+
+Board de 5 colunas com drag-and-drop, painel lateral retrátil explicando o funcionamento do quadro, contadores por coluna atualizados via JS (`updateKanbanCounters`) e filtros (cliente/sistema/responsável/busca) persistidos por query string. Acesso: botão "Kanban" no dashboard (pill indigo, ao lado do botão "Ver Relatórios") e link "Abrir Quadro Kanban Completo" no card de projetos em sprint do próprio dashboard (ver Implementação 51).
+
+### Integração com o dashboard
+
+`_dashboard_projetos_sprint_qs(user)` — helper que alimenta tanto a renderização inicial do dashboard quanto o polling da Implementação 51 — retorna os 4 projetos mais recentes com `status_macro in ('sprint', 'em_construcao', 'homologacao')`, restritos ao cliente do usuário quando `role == 'usuario'`.
+
+---
+
+## Implementação 50 — Containerização Docker
+
+**Status:** Docker Desktop local **implementado e em uso**. Deploy em VPS de produção **ainda não executado** — o roteiro ao final desta seção é o plano, não um relato do que já aconteceu.
+
+**Motivação:** o deploy em produção roda no Railway via Nixpacks/Procfile (PaaS). Para viabilizar deploy autônomo em servidores dedicados/VPS (DigitalOcean, Hetzner, AWS EC2, Linode etc.) ou apenas rodar o projeto localmente sem instalar Python/PostgreSQL na máquina do dev, o projeto ganhou uma containerização Docker completa: `Dockerfile` multi-stage, `docker-compose.yml`, `.dockerignore` e `.env.example`.
+
+### Arquivos reais no repositório
+
+#### `.dockerignore` — ignora build local, segredos e a própria documentação do projeto na imagem.
+
+#### `Dockerfile` — multi-stage (builder + runtime slim, usuário não-root)
+
 ```dockerfile
-# ── STAGE 1: Builder (Compilação e Wheels) ───────────────────────────
+# ── STAGE 1: Builder (compilação de wheels C/Postgres) ──────────────────────
 FROM python:3.11-slim AS builder
-
 WORKDIR /app
-
-# Instala ferramentas necessárias para compilar pacotes C/Postgres
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Cache de dependências
+    build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
-# ── STAGE 2: Runtime (Imagem Final de Produção Enxuta) ───────────────
+# ── STAGE 2: Runtime (imagem final enxuta) ──────────────────────────────────
 FROM python:3.11-slim AS runtime
-
 WORKDIR /app
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8000
-
-# Dependências mínimas de runtime e curl para HEALTHCHECK
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8000
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Cria usuário não-privilegiado
+    libpq5 curl && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r appgroup && useradd -r -g appgroup -u 1000 appuser
-
-# Instala as rodas pré-compiladas do builder
 COPY --from=builder /app/wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache /wheels/* && rm -rf /wheels
-
-# Copia o código-fonte da aplicação
 COPY . .
-
-# Cria pastas necessárias e define permissões
-RUN mkdir -p /app/staticfiles /app/media && \
-    chown -R appuser:appgroup /app
-
+RUN mkdir -p /app/staticfiles /app/media && chown -R appuser:appgroup /app
 USER appuser
-
 EXPOSE 8000
-
-# Healthcheck interno do container
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/login/ || exit 1
-
-# Inicialização com migrações e WSGI Gunicorn
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn setup.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/login/ || exit 1
+CMD ["sh", "-c", \
+    "python manage.py collectstatic --noinput && \
+     python manage.py migrate && \
+     python manage.py setup_inicial && \
+     gunicorn setup.wsgi:application \
+       --bind 0.0.0.0:${PORT:-8000} \
+       --workers 2 \
+       --timeout 120"]
 ```
 
-#### 3. `docker-compose.yml` (Produção na VPS)
+`setup_inicial` roda no `CMD` (não só no Procfile do Railway) para que o container também garanta o superusuário inicial de forma idempotente. `HEALTHCHECK` usa `${PORT:-8000}` em vez de porta fixa, coerente com o `ENV PORT=8000` do estágio de runtime.
+
+#### `docker-compose.yml` — App + PostgreSQL local (Docker Desktop)
+
 ```yaml
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: digiana_chamados_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-digiana_db}
+      POSTGRES_USER: ${POSTGRES_USER:-digiana_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-digiana_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-digiana_user} -d ${POSTGRES_DB:-digiana_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: digiana_chamados_app
-    restart: always
+    container_name: digiana_chamados_web
+    restart: unless-stopped
     env_file:
       - .env
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
-
-  db:
-    image: postgres:15-alpine
-    container_name: digiana_chamados_db
-    restart: always
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-digiana_db}
-      POSTGRES_USER: ${POSTGRES_USER:-digiana_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-segredo}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-digiana_user} -d ${POSTGRES_DB:-digiana_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   postgres_data:
@@ -5023,20 +5030,245 @@ volumes:
   media_volume:
 ```
 
+**Por que a porta do Postgres é `5433:5432` e não `5432:5432`?** No host de desenvolvimento já havia outro projeto Docker publicando `5432`. Remapear para `5433` evita o conflito sem tocar na porta interna do container (`5432`), que é a que a aplicação Django usa via `DATABASE_URL`/`PGPORT` dentro da rede Docker.
+
+**Por que a porta da web é `8001:8000` e não `8000:8000`?** Mesmo motivo — porta `8000` já estava em uso por outro serviço local no host. Internamente o Gunicorn continua ouvindo em `8000` (`PORT` no `Dockerfile`); só o mapeamento externo mudou.
+
+**Por que `restart: unless-stopped` e não `restart: always`?** Em ambiente de desenvolvimento local (Docker Desktop), `unless-stopped` respeita um `docker compose stop` manual do desenvolvedor — o container não sobe sozinho de novo até um `docker compose up` explícito. `always` é mais adequado a produção (VPS), onde se quer que o container volte mesmo após reboot do host sem intervenção manual; ver ressalva no roteiro de VPS abaixo.
+
+**Cloudinary é opcional no Docker/VPS.** `.env.example` documenta que as variáveis `CLOUDINARY_*` só são obrigatórias em PaaS efêmero (Railway), cujo filesystem não persiste entre deploys. Em VPS/Docker com volume nomeado `media_volume`, o armazenamento local em `/app/media` já persiste — Cloudinary vira opcional.
+
+### `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` configuráveis
+
+Para rodar fora do Railway (Docker local, VPS, domínio próprio), `setup/settings.py` passou a ler `ALLOWED_HOSTS` e `CSRF_TRUSTED_ORIGINS` de variáveis de ambiente, com fallback automático para o domínio do Railway quando a variável não é definida:
+
+```python
+_on_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT_NAME'))
+_railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
+
+_csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if _csrf_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_env.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS ...]
+```
+
+Sem essa mudança, subir o container em um host/domínio diferente do Railway resultaria em `DisallowedHost` (Django) ou falha de CSRF em qualquer POST (login, forms).
+
+### Princípios aplicados no Dockerfile
+
+1. **Multi-stage build** — Stage 1 (`builder`) compila dependências C/Postgres (`build-essential`, `libpq-dev`) em wheels; Stage 2 (`runtime`) parte de `python:3.11-slim` limpo e instala só as wheels prontas + `libpq5`/`curl` de runtime, sem ferramentas de compilação na imagem final.
+2. **Cache de camadas** — `requirements.txt` é copiado e instalado antes do código-fonte; mudanças em templates/views não invalidam o cache de dependências Python.
+3. **Usuário não-root** (`appuser:appgroup`, UID/GID 1000) — reduz a superfície de escalada de privilégio caso a aplicação seja comprometida.
+4. **`HEALTHCHECK` nativo** — `curl` contra `/login/` a cada 30 s, permitindo que o Docker Daemon (ou um orquestrador) detecte e reinicie o container automaticamente.
+
+### Pendente — Estudo de Deploy em VPS na Oracle Cloud (OCI)
+
+O ambiente atual de produção é mantido no **Railway** via Nixpacks/Procfile com PostgreSQL gerenciado. Para o plano de migração e deploy autônomo em infraestrutura dedicada, o estudo técnico define o provisionamento na **Oracle Cloud Infrastructure (OCI)** com as seguintes especificações:
+
+#### Especificações da Instância (OCI)
+* **Provedor:** Oracle Cloud Infrastructure (OCI)
+* **Sistema Operacional:** Linux Ubuntu 24.04 LTS (Noble Numbat)
+* **Dimensionamento / Shape:** 2 OCPUs (Ampere A1 Flex ou Standard Shape)
+* **Memória RAM:** 12 GB
+* **Armazenamento:** 50+ GB Boot Volume NVMe
+
+#### Roteiro Completo de Deploy e Migração
+
+1. **Provisionamento e Rede na OCI:**
+   - Criar a instância de computação com Ubuntu 24.04, 2 OCPUs e 12 GB de RAM.
+   - Configurar a *Security List* da VCN (Oracle Cloud) e o firewall do Ubuntu (`iptables` / `ufw`):
+     - Porta `22` (SSH)
+     - Porta `80` (HTTP)
+     - Porta `443` (HTTPS)
+2. **Instalação do Docker Engine & Docker Compose:**
+   - Instalar `docker-ce`, `docker-ce-cli`, `containerd.io` e `docker-compose-plugin` no Ubuntu 24.04.
+   - Adicionar o usuário ao grupo `docker`: `sudo usermod -aG docker ubuntu`.
+3. **Clonagem e Configuração do Repositório:**
+   - Clonar o repositório do GitHub na VPS: `git clone <url-do-repositorio>`.
+   - Configurar o arquivo `.env` de produção com as variáveis reais (`SECRET_KEY`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, chaves da API Brevo).
+4. **Subida dos Contêineres:**
+   - Executar `docker compose up -d --build` para subir o PostgreSQL 15 e a aplicação Django Gunicorn.
+5. **Restauração de Dados (Banco de Dados e Mídia):**
+   - **Banco de Dados:** Importar o backup exportado (`dados_dump.json` ou `fixtures_completo.json` salvo no Google Drive):
+     ```bash
+     docker compose exec -T web python manage.py migrate
+     docker compose exec -T web python manage.py loaddata dados_dump.json
+     ```
+   - **Mídia / Avatares:** Copiar a pasta `media/` (avatares dos usuários) para o volume persistente `media_volume` do Docker (`/app/media`).
+6. **Configuração de Produção & Ajustes no Compose:**
+   - Ajustar `restart: always` para os serviços `web` e `db`.
+   - Manter a porta do Postgres (`5432`) restrita à rede interna do Docker (sem expor porta externa no host).
+7. **Reverse Proxy (Nginx) e Certificado SSL Let's Encrypt:**
+   - Configurar Nginx no host ou como container proxy reverso escutando nas portas `80` e `443`.
+   - Gerar certificado SSL gratuito via `certbot --nginx -d seu-dominio.com.br`.
+   - Redirecionar o tráfego seguro para `http://127.0.0.1:8001` (porta do Gunicorn).
+8. **Rotina de Backup Automatizado:**
+   - Script cron agendado (`cron.daily`) para exportar dumps diários (`pg_dump`) e sincronizar o banco e os arquivos de mídia com o Google Drive / Object Storage.
+
+> ℹ️ **Status Atual:** A produção permanece ativa e operacional no **Railway**. O roteiro acima documenta a arquitetura e os passos para a futura transição para a VPS Oracle Cloud.
+
 ---
 
-### Roteiro de Deploy em VPS (Passo a Passo)
+## Implementação 51 — SPA Parcial no Dashboard (Tabela de Chamados e Sprint em Tempo Real)
 
-1. **Provisionamento da VPS:**
-   - Instalação do Docker Engine e Docker Compose Plugin (`sudo apt install docker.io docker-compose-plugin`).
-2. **Configuração de Firewall (UFW):**
-   - Liberar portas SSH (`22`), HTTP (`80`) e HTTPS (`443`).
-3. **Clonagem do Repositório e `.env`:**
-   - Clonar via Git (`git clone ...`).
-   - Criar arquivo `.env` de produção com as credenciais seguras (`SECRET_KEY`, `POSTGRES_*`, `BREVO_API_KEY`).
-4. **Reverse Proxy (Nginx + SSL Certbot):**
-   - Configurar o Nginx da VPS para receber o tráfego da porta `443` com SSL Let's Encrypt e fazer proxy reverso para `http://127.0.0.1:8000`.
-5. **Subida dos Containers:**
-   - `docker compose up -d --build`
-6. **Rotina de Backup dos Volumes:**
-   - Cronjob diário executando `pg_dump` no container do Postgres e sincronizando a pasta `media_volume` com armazenamento em nuvem (ex: Google Drive / S3).
+**Motivação:** o polling de 15 s introduzido na Implementação 24 atualizava apenas os contadores numéricos dos cards. A tabela de "chamados recentes" e o card de "projetos em sprint" (Implementação 49) só refletiam mudanças após um F5 manual — inconsistente com a proposta de dashboard "ao vivo".
+
+### Backend — `dashboard_stats` passa a renderizar HTML parcial
+
+```python
+@login_required(login_url='login')
+def dashboard_stats(request):
+    role = _role(request.user)
+    qs = _dashboard_chamados_qs(request.user)
+    data = {
+        'total': qs.count(), 'abertos': qs.filter(status='aberto').count(),
+        'em_progresso': qs.filter(status='em_progresso').count(),
+        'pendentes': qs.filter(status='pendente').count(),
+        'resolvidos': qs.filter(status='resolvido').count(),
+    }
+
+    # Só re-renderiza a tabela de "chamados recentes" quando o cliente está
+    # vendo a página 1 — evita substituir a visão de quem já paginou adiante.
+    page_number = request.GET.get('page') or '1'
+    if page_number == '1':
+        paginator = Paginator(qs, 10)
+        page_obj = paginator.get_page(1)
+        data['recentes_html'] = render_to_string('core/_dashboard_chamados_table.html', {
+            'chamados': page_obj, 'page_obj': page_obj, 'user_role': role,
+        }, request=request)
+
+    projetos_sprint = _dashboard_projetos_sprint_qs(request.user)
+    data['projetos_html'] = render_to_string('core/_dashboard_projetos_sprint.html', {
+        'projetos_sprint': projetos_sprint, 'user_role': role,
+    }, request=request)
+
+    return JsonResponse(data)
+```
+
+Dois templates parciais novos, extraídos do `dashboard.html` original: `templates/core/_dashboard_chamados_table.html` (linhas da tabela) e `templates/core/_dashboard_projetos_sprint.html` (cards de projeto em sprint, usado também na Implementação 49).
+
+**Por que não re-renderizar a tabela quando o usuário já paginou?** Sobrescrever `innerHTML` da tabela a cada 15 s enquanto o usuário está na página 3, por exemplo, o jogaria de volta para a página 1 sem aviso. O guard `page_number == '1'` restringe a atualização automática ao caso em que ela não atrapalha a navegação — paginação segue funcionando normalmente via link/reload normal do Django em qualquer página.
+
+### Frontend — substituição de `innerHTML` no `poll()`
+
+```javascript
+fetch(BASE_URL + '?page=' + encodeURIComponent(currentPage))
+    .then(r => r.json())
+    .then(function (data) {
+        // ... setVal dos cards numéricos (Impl. 24) ...
+        if (chamadosBody && typeof data.recentes_html === 'string') {
+            chamadosBody.innerHTML = data.recentes_html;
+        }
+        if (projetosGrid && typeof data.projetos_html === 'string') {
+            projetosGrid.innerHTML = data.projetos_html;
+        }
+    });
+```
+
+### Recolher/expandir a seção de projetos e "Remover da Sprint"
+
+O card de projetos em sprint ganhou um toggle de recolher/expandir (estado não persistido — volta ao padrão em cada carregamento) e um botão "×" por card, visível apenas para `user_role != 'usuario'`, que remove o projeto da visão de sprint sem excluir nada:
+
+```html
+<button type="button" class="sprint-remove-btn" data-projeto-id="{{ proj.id }}"
+        data-projeto-nome="{{ proj.nome|escapejs }}"
+        title="Remover da visão de Sprint (não exclui o projeto nem os chamados)">×</button>
+```
+
+O clique dispara o mesmo endpoint `projeto_mover_kanban` (Implementação 49) com `novo_status='backlog'` — reverte o `status_macro` do projeto para Backlog. O projeto e seus chamados permanecem intactos; ele só sai das 3 colunas que alimentam a visão de sprint do dashboard (`sprint`, `em_construcao`, `homologacao`) e volta a aparecer normalmente no Kanban completo.
+
+---
+
+## Implementação 52 — Modal de Confirmação Reutilizável (`window.DigianaConfirm`)
+
+**Motivação:** todas as ações destrutivas (excluir cliente, projeto, chamado, usuário, SLA, configuração de e-mail, remover projeto da sprint) usavam o `confirm()` nativo do navegador — inconsistente com o tema visual do Digiana e sem espaço para uma mensagem detalhada.
+
+**Marcação declarativa nos forms de exclusão** — qualquer form ganha o modal apenas adicionando atributos `data-*`, sem JS por página:
+
+```html
+<form method="POST" action="{% url 'cliente_delete' cliente.pk %}"
+      data-confirm-title="Excluir cliente?"
+      data-confirm-detail="Esta ação também excluirá todos os projetos e chamados vinculados a {{ cliente.nome }}."
+      data-confirm-ok-label="Excluir">
+    {% csrf_token %}
+    <button type="submit">Excluir</button>
+</form>
+```
+
+**`window.DigianaConfirm`** (definido uma única vez em `base.html`) expõe `DigianaConfirm.ask(title, detail, okLabel)`, que retorna uma `Promise<boolean>`. Um listener global de `submit` (fase de captura) intercepta qualquer `<form data-confirm-title>`, abre o modal e só reenvia o form (`form.requestSubmit()`) se o usuário confirmar — usando um flag `data-confirm-bypass` para não reentrar no interceptor na segunda submissão real.
+
+```javascript
+document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.hasAttribute('data-confirm-title')) return;
+    if (form.dataset.confirmBypass === '1') return;
+    e.preventDefault();
+    window.DigianaConfirm.ask(
+        form.dataset.confirmTitle, form.dataset.confirmDetail || '',
+        form.dataset.confirmOkLabel || 'Excluir'
+    ).then(function (ok) {
+        if (!ok) return;
+        form.dataset.confirmBypass = '1';
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+}, true);
+```
+
+Fechamento por clique fora do modal (`click` no backdrop), tecla `Esc`, e fallback seguro: se o modal não existir no DOM (`#digiana-confirm-modal`), `ask()` resolve `true` imediatamente — nenhum form fica travado por engano.
+
+**Pontos de uso:** exclusão de clientes, projetos, chamados, usuários, SLA, configuração de e-mail, e o botão "Remover da Sprint" do dashboard (Implementação 51), que chama `DigianaConfirm.ask()` diretamente via JS em vez de um form.
+
+---
+
+## Implementação 53 — Login, Avatar e Correções Diversas
+
+### Revelar senha (segurar para mostrar) — `login.html`
+
+Botão dentro do campo de senha que alterna `input.type` entre `password` e `text` **apenas enquanto pressionado** (`mousedown`/`touchstart` → revela; `mouseup`/`touchend`/`mouseleave` → volta a ocultar), com glow ciano consistente com a identidade visual do Digiana (`ia-glow`, Implementação 2):
+
+```javascript
+function reveal() {
+    input.type = 'text';
+    btn.classList.add('is-revealing');
+}
+function hide() {
+    input.type = 'password';
+    btn.classList.remove('is-revealing');
+}
+btn.addEventListener('mousedown', reveal);
+btn.addEventListener('touchstart', function (e) { e.preventDefault(); reveal(); }, { passive: false });
+```
+
+### Banner Dark/Light recortado e realinhado — `login.html`
+
+O banner lateral (`Dark.png`/`Light.png`, Implementação 2) tinha bordas retas que pareciam uma imagem "colada" sobre o fundo. As imagens foram recortadas/realinhadas (logo centralizada) e as bordas dissolvidas via CSS mask (`-webkit-mask-image`/`mask-image` com gradiente linear transparente→opaco→transparente), removendo o efeito de sobreposição abrupta. Os arquivos originais (pré-recorte) ficam preservados em `static/img/_originais_backup/`.
+
+### Correção de arquivo órfão de avatar — `perfil_foto_view`
+
+Antes, trocar a foto de perfil apenas sobrescrevia a referência no banco — o arquivo antigo permanecia no storage (local ou Cloudinary) indefinidamente. A view agora captura o nome do arquivo antigo antes de salvar o novo e o remove do storage correto (`perfil.foto.storage`, que resolve para `FileSystemStorage` local ou `MediaCloudinaryStorage` conforme o ambiente) logo após persistir a troca:
+
+```python
+foto_antiga_nome = perfil.foto.name if perfil.foto else None
+storage = perfil.foto.storage
+perfil.foto = foto
+perfil.save()
+if foto_antiga_nome:
+    storage.delete(foto_antiga_nome)
+```
+
+### Fix — abertura de chamado falhava silenciosamente com 1 único projeto
+
+Quando havia apenas um `Projeto` cadastrado, o `<select>` de projeto no formulário de chamado podia ser submetido sem seleção explícita, e a validação falhava com "campo obrigatório" sem nenhum aviso visível no topo do formulário. `ChamadoForm.__init__` agora pré-seleciona automaticamente o único projeto existente quando não há ambiguidade de escolha:
+
+```python
+if not self.is_bound:
+    projetos_ids = list(Projeto.objects.values_list('id', flat=True)[:2])
+    if len(projetos_ids) == 1:
+        self.fields['projeto'].initial = projetos_ids[0]
+        self.fields['projeto'].empty_label = None
+```
+
+Complementarmente, um banner de erro visível foi adicionado ao topo de `chamado_form.html` para qualquer falha de validação futura — antes, um form inválido podia recarregar a página sem nenhum indicativo do que deu errado (o mesmo padrão de falha silenciosa documentado na Implementação 32).
